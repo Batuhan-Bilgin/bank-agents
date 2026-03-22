@@ -1,17 +1,9 @@
-"""
-Communication & operational tools — email, SMS, alerts, audit logging,
-workflow triggers, approvals, CRM, HR, calendar.
-"""
 
 import random
 import json
 from datetime import datetime
 
 _NOW = lambda: datetime.utcnow().isoformat() + "Z"
-
-# ---------------------------------------------------------------------------
-# Tool: email_sender
-# ---------------------------------------------------------------------------
 
 TOOL_EMAIL = {
     "name": "email_sender",
@@ -46,10 +38,6 @@ def execute_email_sender(to: list, subject: str, body: str, **kwargs) -> dict:
     }
 
 
-# ---------------------------------------------------------------------------
-# Tool: sms_sender
-# ---------------------------------------------------------------------------
-
 TOOL_SMS = {
     "name": "sms_sender",
     "description": "Send SMS notifications to customers via approved channels.",
@@ -83,10 +71,6 @@ def execute_sms_sender(to: str, message: str, **kwargs) -> dict:
         "sent_at": _NOW()
     }
 
-
-# ---------------------------------------------------------------------------
-# Tool: alert_manager
-# ---------------------------------------------------------------------------
 
 TOOL_ALERT = {
     "name": "alert_manager",
@@ -152,10 +136,6 @@ def execute_alert_manager(action: str, **kwargs) -> dict:
     return {"action": action, "status": "PROCESSED"}
 
 
-# ---------------------------------------------------------------------------
-# Tool: audit_logger
-# ---------------------------------------------------------------------------
-
 TOOL_AUDIT = {
     "name": "audit_logger",
     "description": "Write an immutable audit log entry for compliance and forensic purposes.",
@@ -191,10 +171,6 @@ def execute_audit_logger(event_type: str, actor_id: str, action: str,
         "logged_at": _NOW()
     }
 
-
-# ---------------------------------------------------------------------------
-# Tool: workflow_trigger
-# ---------------------------------------------------------------------------
 
 TOOL_WORKFLOW = {
     "name": "workflow_trigger",
@@ -235,10 +211,6 @@ def execute_workflow_trigger(workflow_name: str, entity_id: str, **kwargs) -> di
     }
 
 
-# ---------------------------------------------------------------------------
-# Tool: approval_request
-# ---------------------------------------------------------------------------
-
 TOOL_APPROVAL = {
     "name": "approval_request",
     "description": "Submit an action for human approval before execution.",
@@ -277,10 +249,6 @@ def execute_approval_request(request_type: str, requested_by: str, subject: str,
         "submitted_at": _NOW()
     }
 
-
-# ---------------------------------------------------------------------------
-# Tool: report_generator
-# ---------------------------------------------------------------------------
 
 TOOL_REPORT = {
     "name": "report_generator",
@@ -324,10 +292,6 @@ def execute_report_generator(report_name: str, report_type: str,
     }
 
 
-# ---------------------------------------------------------------------------
-# Tool: dashboard_writer
-# ---------------------------------------------------------------------------
-
 TOOL_DASHBOARD = {
     "name": "dashboard_writer",
     "description": "Write or update KPI metrics to management dashboards.",
@@ -366,10 +330,6 @@ def execute_dashboard_writer(dashboard_id: str, metrics: list, **kwargs) -> dict
         "updated_at": _NOW()
     }
 
-
-# ---------------------------------------------------------------------------
-# Tool: sentiment_analyzer
-# ---------------------------------------------------------------------------
 
 TOOL_SENTIMENT = {
     "name": "sentiment_analyzer",
@@ -412,10 +372,6 @@ def execute_sentiment_analyzer(text: str, source: str = "chat_log",
         result["themes"] = themes
     return result
 
-
-# ---------------------------------------------------------------------------
-# Tool: crm_api
-# ---------------------------------------------------------------------------
 
 TOOL_CRM = {
     "name": "crm_api",
@@ -463,10 +419,6 @@ def execute_crm_api(action: str, customer_id: str, **kwargs) -> dict:
         }
     return {"success": True, "action": action, "customer_id": customer_id, "updated_at": _NOW()}
 
-
-# ---------------------------------------------------------------------------
-# Tool: product_catalog
-# ---------------------------------------------------------------------------
 
 TOOL_PRODUCTS = {
     "name": "product_catalog",
@@ -518,10 +470,6 @@ def execute_product_catalog(product_type: str, customer_segment: str = "all",
     }
 
 
-# ---------------------------------------------------------------------------
-# Tool: hr_system_api
-# ---------------------------------------------------------------------------
-
 TOOL_HR = {
     "name": "hr_system_api",
     "description": "Access HR data for workforce analytics, training records, and performance.",
@@ -561,10 +509,6 @@ def execute_hr_system(action: str, employee_id: str | None = None, **kwargs) -> 
         }
     return {"action": action, "status": "PROCESSED", "timestamp": _NOW()}
 
-
-# ---------------------------------------------------------------------------
-# Tool: calendar_api
-# ---------------------------------------------------------------------------
 
 TOOL_CALENDAR = {
     "name": "calendar_api",

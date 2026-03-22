@@ -1,7 +1,3 @@
-"""
-Tool Registry — centralises all 35 banking tools.
-Maps tool name → (schema_dict, callable).
-"""
 
 from tools.banking_tools import (
     TOOL_DATABASE_QUERY,   execute_database_query,
@@ -46,10 +42,6 @@ from tools.communication_tools import (
     TOOL_CALENDAR,         execute_calendar_api,
 )
 
-# ---------------------------------------------------------------------------
-# Master registry: tool_name → (schema, handler)
-# ---------------------------------------------------------------------------
-
 _REGISTRY: dict[str, tuple[dict, callable]] = {
     "database_query":          (TOOL_DATABASE_QUERY,          execute_database_query),
     "customer_360_lookup":     (TOOL_CUSTOMER_360,            execute_customer_360),
@@ -85,7 +77,6 @@ _REGISTRY: dict[str, tuple[dict, callable]] = {
     "product_catalog":         (TOOL_PRODUCTS,                execute_product_catalog),
     "hr_system_api":           (TOOL_HR,                      execute_hr_system),
     "calendar_api":            (TOOL_CALENDAR,                execute_calendar_api),
-    # Aliases used in config that map to existing tools
     "limit_override_request":  (TOOL_APPROVAL,                execute_approval_request),
 }
 
@@ -96,7 +87,6 @@ def get_tool_schema(name: str) -> dict | None:
 
 
 def execute_tool(name: str, arguments: dict) -> dict:
-    """Execute a tool by name with the provided arguments dict."""
     entry = _REGISTRY.get(name)
     if not entry:
         return {"error": f"Tool '{name}' not found in registry", "available": list(_REGISTRY.keys())}
@@ -108,7 +98,6 @@ def execute_tool(name: str, arguments: dict) -> dict:
 
 
 def get_schemas_for_agent(tool_names: list[str]) -> list[dict]:
-    """Return the list of Anthropic-compatible tool schemas for given tool names."""
     schemas = []
     for name in tool_names:
         schema = get_tool_schema(name)

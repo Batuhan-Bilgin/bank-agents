@@ -1,18 +1,3 @@
-"""
-BankAI REST API — expose agents via HTTP endpoints.
-
-Usage:
-  uvicorn api.server:app --reload --port 8080
-
-Endpoints:
-  GET  /agents              → list all agents
-  GET  /agents/{id}         → agent details
-  POST /agents/{id}/chat    → chat with specific agent
-  POST /auto                → auto-route task to best agent
-  POST /pipeline            → run task through multiple agents sequentially
-  GET  /departments         → list departments
-  GET  /health              → health check
-"""
 
 import os
 from typing import Optional
@@ -36,7 +21,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Lazy factory import (avoids circular init)
 _factory = None
 def get_factory():
     global _factory
@@ -45,8 +29,6 @@ def get_factory():
         _factory = _get_factory()
     return _factory
 
-
-# ── Request / Response models ──────────────────────────────────────────────────
 
 class ChatRequest(BaseModel):
     message: str
@@ -82,8 +64,6 @@ class AgentSummary(BaseModel):
     authority_level: int
     tool_count: int
 
-
-# ── Endpoints ──────────────────────────────────────────────────────────────────
 
 @app.get("/health")
 def health():

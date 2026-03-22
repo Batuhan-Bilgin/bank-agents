@@ -1,7 +1,3 @@
-"""
-GroqBaseAgent — same interface as BaseAgent but uses Groq API (free tier).
-Supports tool use via OpenAI-compatible function calling.
-"""
 
 import json
 import os
@@ -22,10 +18,6 @@ MAX_TOOL_LOOPS = 15
 
 
 class GroqBaseAgent:
-    """
-    Banking AI Agent powered by Groq (Llama 3.3 70B) with tool use.
-    Drop-in replacement for BaseAgent — same public interface.
-    """
 
     def __init__(self, config: dict):
         self.id: str = config["id"]
@@ -45,11 +37,7 @@ class GroqBaseAgent:
         self._client: groq_sdk.Groq | None = None
         self._anthropic_schemas = get_schemas_for_agent(self.tool_names)
         self._tool_schemas = self._to_openai_tools(self._anthropic_schemas)
-        self._conversation: list[dict] = []   # OpenAI-format history
-
-    # ------------------------------------------------------------------
-    # Tool schema conversion: Anthropic → OpenAI/Groq
-    # ------------------------------------------------------------------
+        self._conversation: list[dict] = []
 
     @staticmethod
     def _to_openai_tools(anthropic_schemas: list[dict]) -> list[dict]:
@@ -66,10 +54,6 @@ class GroqBaseAgent:
                 },
             })
         return tools
-
-    # ------------------------------------------------------------------
-    # System prompt
-    # ------------------------------------------------------------------
 
     def _build_system_prompt(self) -> str:
         compliance_str = ", ".join(self.compliance_flags) if self.compliance_flags else "Standard"
@@ -116,10 +100,6 @@ Always apply relevant regulatory requirements in every decision.
 - Support both Turkish (tr) and English (en) — respond in the language the user writes in.
 - Never disclose sensitive customer data beyond what is necessary."""
 
-    # ------------------------------------------------------------------
-    # Core agentic loop
-    # ------------------------------------------------------------------
-
     def chat(self, user_message: str, verbose: bool = True) -> str:
         self._conversation.append({"role": "user", "content": user_message})
 
@@ -135,11 +115,9 @@ Always apply relevant regulatory requirements in every decision.
             try:
                 response = self._call_api()
             except groq_sdk.BadRequestError as e:
-                # Model generated a malformed tool call — return what we have
                 err_msg = str(e)
                 if verbose:
                     console.print(f"  [red]Model error:[/red] [dim]{err_msg[:200]}[/dim]")
-                # Try once more without tools to get a text summary
                 try:
                     fallback = self._get_client().chat.completions.create(
                         model=GROQ_MODEL,
@@ -159,7 +137,6 @@ Always apply relevant regulatory requirements in every decision.
             message = response.choices[0].message
             finish_reason = response.choices[0].finish_reason
 
-            # Append assistant turn
             self._conversation.append({
                 "role": "assistant",
                 "content": message.content or "",
@@ -173,7 +150,6 @@ Always apply relevant regulatory requirements in every decision.
                 ]} if message.tool_calls else {})
             })
 
-            # No tool calls → done
             if finish_reason != "tool_calls" or not message.tool_calls:
                 final_text = (message.content or "").strip()
                 if verbose and final_text:
@@ -183,7 +159,6 @@ Always apply relevant regulatory requirements in every decision.
                     ))
                 return final_text
 
-            # Execute tool calls
             for tc in message.tool_calls:
                 try:
                     arguments = json.loads(tc.function.arguments)
@@ -230,10 +205,6 @@ Always apply relevant regulatory requirements in every decision.
             kwargs["tool_choice"] = "auto"
 
         return self._get_client().chat.completions.create(**kwargs)
-
-    # ------------------------------------------------------------------
-    # Conversation management
-    # ------------------------------------------------------------------
 
     def reset(self):
         self._conversation = []

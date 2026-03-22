@@ -1,7 +1,3 @@
-"""
-Base HTTP client with retry, timeout, and auth handling.
-All integration clients inherit from this.
-"""
 import time
 import logging
 from typing import Any
@@ -12,13 +8,6 @@ logger = logging.getLogger(__name__)
 
 
 class BaseIntegrationClient:
-    """
-    Shared HTTP client with:
-    - Configurable timeout & retries
-    - Bearer token auth (auto-refresh)
-    - Structured error responses
-    - Request/response logging
-    """
 
     def __init__(
         self,
@@ -71,7 +60,6 @@ class BaseIntegrationClient:
                 )
 
                 if response.status_code == 401:
-                    # Token may have expired — refresh and retry
                     self._token = None
                     self._refresh_token()
                     headers = self._headers(extra_headers)
@@ -103,7 +91,6 @@ class BaseIntegrationClient:
         ) from last_exc
 
     def _refresh_token(self) -> None:
-        """Override in subclass to perform OAuth token refresh."""
         pass
 
 

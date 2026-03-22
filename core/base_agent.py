@@ -1,7 +1,3 @@
-"""
-BaseAgent — core agentic loop using the Anthropic API with tool use.
-All 100 banking agents inherit from this class.
-"""
 
 import json
 import os
@@ -21,19 +17,10 @@ console = Console()
 
 MODEL = "claude-opus-4-6"
 MAX_TOKENS = 8192
-MAX_TOOL_LOOPS = 15          # safety cap on agentic loops
+MAX_TOOL_LOOPS = 15
 
 
 class BaseAgent:
-    """
-    Banking AI Agent powered by Claude Opus 4.6 with adaptive thinking.
-
-    Each agent is configured via agents_config.json and has:
-    - A rich system prompt (base_instructions)
-    - A specific set of permitted tools
-    - Authority level constraints
-    - Compliance framework awareness
-    """
 
     def __init__(self, config: dict):
         self.id: str = config["id"]
@@ -50,13 +37,9 @@ class BaseAgent:
         self.max_auto_approval: float = config.get("max_auto_approval_amount", 0)
         self.audit_required: bool = config.get("audit_required", True)
 
-        self._client: anthropic.Anthropic | None = None  # lazy init on first call
+        self._client: anthropic.Anthropic | None = None
         self._tool_schemas = get_schemas_for_agent(self.tool_names)
         self._conversation: list[dict] = []
-
-    # ------------------------------------------------------------------
-    # System prompt construction
-    # ------------------------------------------------------------------
 
     def _build_system_prompt(self) -> str:
         compliance_str = ", ".join(self.compliance_flags) if self.compliance_flags else "Standard"
@@ -101,15 +84,7 @@ You may access the following data categories: {", ".join(self.data_access) if se
 - For ambiguous requests, ask clarifying questions before acting.
 """
 
-    # ------------------------------------------------------------------
-    # Core agentic loop
-    # ------------------------------------------------------------------
-
     def chat(self, user_message: str, verbose: bool = True) -> str:
-        """
-        Process a user message through the full agentic loop.
-        Returns the final text response.
-        """
         self._conversation.append({"role": "user", "content": user_message})
 
         if verbose:
@@ -123,7 +98,6 @@ You may access the following data categories: {", ".join(self.data_access) if se
             loop_count += 1
             response = self._call_api()
 
-            # Collect text and tool calls from the response
             text_blocks = []
             tool_calls = []
             for block in response.content:
@@ -132,13 +106,11 @@ You may access the following data categories: {", ".join(self.data_access) if se
                 elif block.type == "tool_use":
                     tool_calls.append(block)
 
-            # Append assistant turn to conversation history
             self._conversation.append({
                 "role": "assistant",
                 "content": response.content
             })
 
-            # If no tool calls — we're done
             if response.stop_reason == "end_turn" or not tool_calls:
                 final_text = "\n".join(text_blocks).strip()
                 if verbose and final_text:
@@ -146,7 +118,6 @@ You may access the following data categories: {", ".join(self.data_access) if se
                                         border_style="blue"))
                 return final_text
 
-            # Execute all tool calls
             tool_results = []
             for tc in tool_calls:
                 if verbose:
@@ -161,7 +132,6 @@ You may access the following data categories: {", ".join(self.data_access) if se
                     "content": json.dumps(result, ensure_ascii=False, default=str)
                 })
 
-            # Feed tool results back
             self._conversation.append({"role": "user", "content": tool_results})
 
         return "Maximum tool loop iterations reached. Please refine your request."
@@ -178,7 +148,6 @@ You may access the following data categories: {", ".join(self.data_access) if se
         return self._client
 
     def _call_api(self) -> anthropic.types.Message:
-        """Single API call with adaptive thinking."""
         kwargs: dict[str, Any] = {
             "model": MODEL,
             "max_tokens": MAX_TOKENS,
@@ -191,12 +160,7 @@ You may access the following data categories: {", ".join(self.data_access) if se
 
         return self._get_client().messages.create(**kwargs)
 
-    # ------------------------------------------------------------------
-    # Conversation management
-    # ------------------------------------------------------------------
-
     def reset(self):
-        """Clear conversation history (start fresh session)."""
         self._conversation = []
 
     def get_history(self) -> list[dict]:

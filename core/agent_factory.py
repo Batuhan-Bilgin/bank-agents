@@ -1,7 +1,3 @@
-"""
-AgentFactory — loads agents from agents_config.json and instantiates BaseAgent objects.
-Provides lookup by ID, role, department, or specialization keyword.
-"""
 
 import json
 import re
@@ -19,7 +15,6 @@ CONFIG_PATH = Path(__file__).parent.parent / "agents_config.json"
 
 
 def _agent_class():
-    """Return the right agent class based on PROVIDER env var."""
     provider = os.environ.get("PROVIDER", "anthropic").lower()
     if provider == "groq":
         from core.groq_agent import GroqBaseAgent
@@ -28,10 +23,6 @@ def _agent_class():
 
 
 class AgentFactory:
-    """
-    Singleton-style factory that reads agents_config.json once and
-    builds / caches agent instances on demand.
-    """
 
     def __init__(self, config_path: Path = CONFIG_PATH):
         with open(config_path, encoding="utf-8") as f:
@@ -40,7 +31,6 @@ class AgentFactory:
         self._configs: dict[str, dict] = {a["id"]: a for a in raw["agents"]}
         self._instances: dict[str, BaseAgent] = {}
 
-        # Build indexes for fast lookup
         self._by_role: dict[str, list[str]] = {}
         self._by_department: dict[str, list[str]] = {}
 
@@ -52,12 +42,7 @@ class AgentFactory:
 
         self.total = len(self._configs)
 
-    # ------------------------------------------------------------------
-    # Creation / retrieval
-    # ------------------------------------------------------------------
-
     def get(self, agent_id: str) -> BaseAgent:
-        """Get (or create) an agent by its unique ID."""
         if agent_id not in self._instances:
             cfg = self._configs.get(agent_id)
             if cfg is None:
@@ -66,7 +51,6 @@ class AgentFactory:
         return self._instances[agent_id]
 
     def get_by_role(self, role_keyword: str) -> list[BaseAgent]:
-        """Find agents whose role contains the given keyword (case-insensitive)."""
         kw = role_keyword.lower()
         matches = []
         for role, ids in self._by_role.items():
@@ -75,20 +59,14 @@ class AgentFactory:
         return [self.get(aid) for aid in matches]
 
     def get_by_department(self, department: str) -> list[BaseAgent]:
-        """Get all agents in a department."""
         dept_key = department.lower()
         ids = self._by_department.get(dept_key, [])
         return [self.get(aid) for aid in ids]
 
     def best_agent_for(self, task_description: str) -> BaseAgent:
-        """
-        Simple keyword-based routing to find the most relevant agent.
-        Returns the first strong match, or the general inquiry agent as fallback.
-        """
         task_lower = task_description.lower()
 
         routing_map = [
-            # (keywords, department or agent_id)
             (["fraud", "scam", "suspicious transaction", "card fraud"],       "fraud detection"),
             (["aml", "money laundering", "suspicious activity", "str", "ctr"], "aml/kyc"),
             (["sanctions", "ofac", "blocked", "blacklist"],                   "aml/kyc"),
@@ -114,7 +92,6 @@ class AgentFactory:
         ]
 
         def _matches(kw: str, text: str) -> bool:
-            """Word-boundary match for short keywords (≤4 chars), substring for longer ones."""
             if len(kw) <= 4:
                 return bool(re.search(r'\b' + re.escape(kw) + r'\b', text))
             return kw in text
@@ -124,17 +101,11 @@ class AgentFactory:
                 dept_key = target.lower()
                 ids = self._by_department.get(dept_key, [])
                 if ids:
-                    return self.get(ids[0])  # return first agent in that department
+                    return self.get(ids[0])
 
-        # Fallback: customer inquiry agent
         return self.get("customer_inquiry_agent_027")
 
-    # ------------------------------------------------------------------
-    # Listing helpers
-    # ------------------------------------------------------------------
-
     def list_agents(self, department: str | None = None) -> list[dict]:
-        """List all agent summaries, optionally filtered by department."""
         results = []
         for cfg in self._configs.values():
             if department and cfg["department"].lower() != department.lower():
@@ -166,10 +137,6 @@ class AgentFactory:
             "cached_instances": len(self._instances)
         }
 
-
-# ---------------------------------------------------------------------------
-# Module-level singleton
-# ---------------------------------------------------------------------------
 
 _factory: AgentFactory | None = None
 

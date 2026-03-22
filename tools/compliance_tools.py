@@ -1,8 +1,3 @@
-"""
-Compliance & Risk tools — AML screening, sanctions, KYC, fraud detection,
-document OCR, data quality, regulatory reporting.
-Uses MASAK live API when credentials are configured, otherwise mock data.
-"""
 
 import random
 import hashlib
@@ -10,7 +5,6 @@ from datetime import datetime
 
 _NOW = lambda: datetime.utcnow().isoformat() + "Z"
 
-# Real integration clients
 try:
     from integrations.masak_client import (
         screen_aml as _masak_screen,
@@ -21,10 +15,6 @@ try:
 except ImportError:
     _MASAK_AVAILABLE = False
 
-
-# ---------------------------------------------------------------------------
-# Tool: fraud_detection_api
-# ---------------------------------------------------------------------------
 
 TOOL_FRAUD_DETECTION = {
     "name": "fraud_detection_api",
@@ -78,10 +68,6 @@ def execute_fraud_detection(event_type: str, customer_id: str, **kwargs) -> dict
     }
 
 
-# ---------------------------------------------------------------------------
-# Tool: aml_screening
-# ---------------------------------------------------------------------------
-
 TOOL_AML_SCREENING = {
     "name": "aml_screening",
     "description": "Screen transactions and customer behaviors for AML typologies and generate alerts.",
@@ -112,7 +98,6 @@ TOOL_AML_SCREENING = {
 def execute_aml_screening(screening_type: str, customer_id: str,
                           transaction_data: dict | None = None,
                           lookback_days: int = 90) -> dict:
-    """AML screening — routes to MASAK API if configured, otherwise mock."""
     if _MASAK_AVAILABLE:
         return _masak_screen(screening_type, customer_id, transaction_data, lookback_days)
     typologies_detected = []
@@ -136,10 +121,6 @@ def execute_aml_screening(screening_type: str, customer_id: str,
         "screened_at": _NOW(),
     }
 
-
-# ---------------------------------------------------------------------------
-# Tool: sanctions_check
-# ---------------------------------------------------------------------------
 
 TOOL_SANCTIONS = {
     "name": "sanctions_check",
@@ -173,7 +154,6 @@ TOOL_SANCTIONS = {
 
 def execute_sanctions_check(name: str, entity_type: str = "individual",
                             lists_to_check: list | None = None, **kwargs) -> dict:
-    """Sanctions screening — routes to MASAK if configured, otherwise mock."""
     if _MASAK_AVAILABLE:
         return _masak_sanctions(name, entity_type, lists_to_check, **kwargs)
     lists = lists_to_check or ["OFAC_SDN", "UN_CONSOLIDATED", "EU_SANCTIONS", "TR_OFFICIAL"]
@@ -199,10 +179,6 @@ def execute_sanctions_check(name: str, entity_type: str = "individual",
         "screened_at": _NOW(),
     }
 
-
-# ---------------------------------------------------------------------------
-# Tool: kyc_verification
-# ---------------------------------------------------------------------------
 
 TOOL_KYC = {
     "name": "kyc_verification",
@@ -230,7 +206,7 @@ TOOL_KYC = {
 def execute_kyc_verification(customer_id: str, verification_type: str,
                              document_type: str | None = None,
                              document_number: str | None = None) -> dict:
-    passed = random.random() > 0.05  # 95% pass rate
+    passed = random.random() > 0.05
     return {
         "customer_id": customer_id,
         "verification_type": verification_type,
@@ -250,10 +226,6 @@ def execute_kyc_verification(customer_id: str, verification_type: str,
         "next_review_date": "2026-03-20"
     }
 
-
-# ---------------------------------------------------------------------------
-# Tool: document_ocr
-# ---------------------------------------------------------------------------
 
 TOOL_DOCUMENT_OCR = {
     "name": "document_ocr",
@@ -315,10 +287,6 @@ def execute_document_ocr(document_id: str, document_type: str,
     }
 
 
-# ---------------------------------------------------------------------------
-# Tool: data_quality_checker
-# ---------------------------------------------------------------------------
-
 TOOL_DATA_QUALITY = {
     "name": "data_quality_checker",
     "description": "Run data quality checks on datasets or data domains and return DQ scores.",
@@ -368,10 +336,6 @@ def execute_data_quality(domain: str, check_type: str = "all", sample_size: int 
     }
 
 
-# ---------------------------------------------------------------------------
-# Tool: data_lineage_api
-# ---------------------------------------------------------------------------
-
 TOOL_DATA_LINEAGE = {
     "name": "data_lineage_api",
     "description": "Query data lineage information to trace data elements from source to consumption.",
@@ -414,10 +378,6 @@ def execute_data_lineage(data_element: str, direction: str = "both", depth: int 
         "last_updated": _NOW()
     }
 
-
-# ---------------------------------------------------------------------------
-# Tool: regulatory_reporting_api
-# ---------------------------------------------------------------------------
 
 TOOL_REG_REPORTING = {
     "name": "regulatory_reporting_api",

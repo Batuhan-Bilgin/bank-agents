@@ -1,15 +1,3 @@
-"""
-BankAI — Main entry point.
-
-Usage:
-  python main.py                         # Interactive CLI
-  python main.py --demo                  # Run built-in demos
-  python main.py --list                  # List all agents
-  python main.py --list --dept "Fraud Detection"   # Filter by department
-  python main.py --stats                 # Agent network statistics
-  python main.py --agent <id> --task "..." # Run specific agent
-  python main.py --auto --task "..."     # Auto-route task
-"""
 
 import argparse
 import sys
@@ -32,7 +20,6 @@ def check_env():
 
 
 def demo_mode(orchestrator):
-    """Run a curated set of demos showcasing different agent departments."""
     demos = [
         {
             "title": "Credit Risk — Loan Application Review",
@@ -102,7 +89,6 @@ def demo_mode(orchestrator):
 
 
 def interactive_cli(orchestrator):
-    """Interactive REPL for chatting with any agent."""
     console.print("\n[bold green]BankAI Interactive Mode[/bold green]")
     console.print("[dim]Commands: /list, /list <dept>, /stats, /agent <id>, /auto, /quit[/dim]\n")
 
@@ -118,7 +104,6 @@ def interactive_cli(orchestrator):
         if not user_input:
             continue
 
-        # Commands
         if user_input == "/quit" or user_input == "/exit":
             console.print("[dim]Goodbye.[/dim]")
             break
@@ -154,7 +139,6 @@ def interactive_cli(orchestrator):
             console.print(f"[red]Unknown command:[/red] {user_input}")
 
         else:
-            # Regular message
             if current_agent:
                 current_agent.chat(user_input)
             else:
@@ -174,7 +158,6 @@ def main():
 
     check_env()
 
-    # Import here so env check runs first
     from core.orchestrator import Orchestrator
     orchestrator = Orchestrator()
 
@@ -198,7 +181,6 @@ def main():
         demo_mode(orchestrator)
         return
 
-    # Default: interactive
     interactive_cli(orchestrator)
 
 

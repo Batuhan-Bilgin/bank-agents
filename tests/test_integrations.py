@@ -1,7 +1,3 @@
-"""
-Integration client tests — validates mock fallbacks and config loading.
-Does NOT make real HTTP calls (no credentials in test environment).
-"""
 
 import sys
 import os
@@ -13,7 +9,6 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 
 class TestIntegrationConfig(unittest.TestCase):
-    """Test configuration loading and status detection."""
 
     def test_config_loads_without_credentials(self):
         from integrations.config import IntegrationConfig
@@ -23,9 +18,7 @@ class TestIntegrationConfig(unittest.TestCase):
         self.assertIsNotNone(cfg.t24_base_url)
 
     def test_all_unconfigured_by_default(self):
-        """Without env vars all integrations should be MOCK."""
         with patch.dict(os.environ, {}, clear=False):
-            # Remove all integration keys if present
             keys = ["KKB_CLIENT_ID", "KKB_CLIENT_SECRET",
                     "MASAK_API_KEY", "MASAK_INSTITUTION_CODE",
                     "T24_USERNAME", "T24_PASSWORD",
@@ -62,7 +55,6 @@ class TestIntegrationConfig(unittest.TestCase):
 
 
 class TestKKBClient(unittest.TestCase):
-    """Test KKB credit bureau — mock fallback only."""
 
     def test_mock_credit_bureau_returns_valid_structure(self):
         from integrations.kkb_client import query_credit_bureau
@@ -76,7 +68,6 @@ class TestKKBClient(unittest.TestCase):
         self.assertLessEqual(result["credit_score"], 900)
 
     def test_mock_credit_bureau_deterministic(self):
-        """Same national_id should return same score."""
         from integrations.kkb_client import query_credit_bureau
         r1 = query_credit_bureau("98765432109", "standard")
         r2 = query_credit_bureau("98765432109", "standard")
@@ -103,7 +94,6 @@ class TestKKBClient(unittest.TestCase):
 
 
 class TestMASAKClient(unittest.TestCase):
-    """Test MASAK AML screening — mock fallback only."""
 
     def test_mock_aml_screening_structure(self):
         from integrations.masak_client import screen_aml
@@ -135,7 +125,6 @@ class TestMASAKClient(unittest.TestCase):
         self.assertEqual(result["source"], "MOCK")
 
     def test_low_hit_rate_for_sanctions(self):
-        """Sanctions hit rate should be low (realistic)."""
         from integrations.masak_client import check_sanctions
         hits = sum(
             check_sanctions(f"Person {i}", "individual")["hit"]
@@ -145,7 +134,6 @@ class TestMASAKClient(unittest.TestCase):
 
 
 class TestT24Client(unittest.TestCase):
-    """Test T24 core banking — mock fallback only."""
 
     def test_mock_query_customer(self):
         from integrations.t24_client import query_core_banking
@@ -171,7 +159,6 @@ class TestT24Client(unittest.TestCase):
         self.assertIn("kyc", result)
 
     def test_mock_customer_360_deterministic(self):
-        """Same customer_id should return same segment."""
         from integrations.t24_client import get_customer_360
         r1 = get_customer_360("C99999")
         r2 = get_customer_360("C99999")
@@ -187,14 +174,13 @@ class TestT24Client(unittest.TestCase):
 
 
 class TestTCMBClient(unittest.TestCase):
-    """Test TCMB FX rate client — uses reference rates as fallback."""
 
     def test_usdtry_rate(self):
         from integrations.tcmb_client import get_fx_rate
         result = get_fx_rate("USD", "TRY")
         self.assertEqual(result["base"], "USD")
         self.assertEqual(result["quote"], "TRY")
-        self.assertGreater(result["mid_rate"], 30)  # sanity check
+        self.assertGreater(result["mid_rate"], 30)
         self.assertIn("bid", result)
         self.assertIn("ask", result)
         self.assertGreater(result["ask"], result["bid"])
@@ -212,7 +198,6 @@ class TestTCMBClient(unittest.TestCase):
                                result["mid_rate"] * 1000, delta=1)
 
     def test_forward_tenor_higher_than_spot(self):
-        """Forward rates should generally be higher for USD/TRY."""
         from integrations.tcmb_client import get_fx_rate
         spot = get_fx_rate("USD", "TRY", tenor="spot")
         fwd_1y = get_fx_rate("USD", "TRY", tenor="1y")
@@ -226,7 +211,6 @@ class TestTCMBClient(unittest.TestCase):
         self.assertIn("BIST100", result["quotes"])
 
     def test_unknown_pair_returns_value(self):
-        """Unknown FX pair should return some rate (not crash)."""
         from integrations.tcmb_client import get_fx_rate
         result = get_fx_rate("XYZ", "ABC")
         self.assertIn("mid_rate", result)
@@ -234,7 +218,6 @@ class TestTCMBClient(unittest.TestCase):
 
 
 class TestToolsUseIntegrations(unittest.TestCase):
-    """Test that tool wrappers correctly route to integration clients."""
 
     def test_banking_tools_credit_bureau_uses_integration(self):
         from tools.banking_tools import execute_credit_bureau

@@ -1,7 +1,3 @@
-"""
-Integration configuration — reads credentials from environment variables.
-All values default to None; tools fall back to mock when None.
-"""
 import os
 from dataclasses import dataclass, field
 from dotenv import load_dotenv
@@ -11,9 +7,6 @@ load_dotenv()
 
 @dataclass
 class IntegrationConfig:
-    # -----------------------------------------------------------------------
-    # KKB — Kredi Kayıt Bürosu (Turkish Credit Bureau)
-    # -----------------------------------------------------------------------
     kkb_base_url: str = field(
         default_factory=lambda: os.getenv("KKB_BASE_URL", "https://api.kkb.com.tr/v2")
     )
@@ -24,12 +17,9 @@ class IntegrationConfig:
         default_factory=lambda: os.getenv("KKB_CLIENT_SECRET")
     )
     kkb_member_code: str | None = field(
-        default_factory=lambda: os.getenv("KKB_MEMBER_CODE")  # Üye kodu
+        default_factory=lambda: os.getenv("KKB_MEMBER_CODE")
     )
 
-    # -----------------------------------------------------------------------
-    # MASAK — Mali Suçları Araştırma Kurulu (Turkish FIU)
-    # -----------------------------------------------------------------------
     masak_base_url: str = field(
         default_factory=lambda: os.getenv("MASAK_BASE_URL", "https://api.masak.gov.tr/v1")
     )
@@ -40,9 +30,6 @@ class IntegrationConfig:
         default_factory=lambda: os.getenv("MASAK_INSTITUTION_CODE")
     )
 
-    # -----------------------------------------------------------------------
-    # T24 / Temenos Core Banking
-    # -----------------------------------------------------------------------
     t24_base_url: str = field(
         default_factory=lambda: os.getenv("T24_BASE_URL", "http://localhost:9089/irf-provider-container/api")
     )
@@ -56,25 +43,16 @@ class IntegrationConfig:
         default_factory=lambda: os.getenv("T24_COMPANY_ID", "TR0010001")
     )
 
-    # -----------------------------------------------------------------------
-    # TCMB — Türkiye Cumhuriyet Merkez Bankası
-    #   Döviz kurları: today.xml (auth gerekmez)
-    #   Faiz/Enflasyon: EVDS3 (kullanıcı adı + şifre gerekir)
-    # -----------------------------------------------------------------------
     tcmb_username: str | None = field(
         default_factory=lambda: os.getenv("TCMB_USERNAME")
     )
     tcmb_password: str | None = field(
         default_factory=lambda: os.getenv("TCMB_PASSWORD")
     )
-    # Eski alan — geriye dönük uyum için tutuldu
     tcmb_api_key: str | None = field(
         default_factory=lambda: os.getenv("TCMB_API_KEY")
     )
 
-    # -----------------------------------------------------------------------
-    # SWIFT Alliance Gateway / Alliance Lite2
-    # -----------------------------------------------------------------------
     swift_base_url: str = field(
         default_factory=lambda: os.getenv("SWIFT_BASE_URL", "https://api.swiftnet.sipn.swift.com/swift-preval-pilot/v3")
     )
@@ -88,9 +66,6 @@ class IntegrationConfig:
         default_factory=lambda: os.getenv("SWIFT_BIC", "BANKTRISBXXX")
     )
 
-    # -----------------------------------------------------------------------
-    # General HTTP settings
-    # -----------------------------------------------------------------------
     http_timeout: float = field(
         default_factory=lambda: float(os.getenv("INTEGRATION_HTTP_TIMEOUT", "15.0"))
     )
@@ -111,7 +86,6 @@ class IntegrationConfig:
         return bool(self.t24_username and self.t24_password)
 
     def is_tcmb_configured(self) -> bool:
-        """EVDS3 için kullanıcı adı + şifre gerekir (döviz kurları için gerekmez)."""
         return bool(self.tcmb_username and self.tcmb_password)
 
     def is_swift_configured(self) -> bool:
@@ -127,7 +101,6 @@ class IntegrationConfig:
         }
 
 
-# Module-level singleton
 _config: IntegrationConfig | None = None
 
 

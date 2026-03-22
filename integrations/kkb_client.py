@@ -1,10 +1,3 @@
-"""
-KKB (Kredi Kayıt Bürosu) Integration Client
-Türkiye'nin kredi bürosu — FINDEKS / KKB Risk Raporu API
-
-Real API docs: https://developer.findeks.com
-Requires: KKB_CLIENT_ID, KKB_CLIENT_SECRET, KKB_MEMBER_CODE env vars
-"""
 import time
 import logging
 import random
@@ -30,15 +23,6 @@ def _mask(value: str, visible: int = 4) -> str:
 
 
 class KKBClient(BaseIntegrationClient):
-    """
-    KKB / FINDEKS Credit Bureau API client.
-
-    Endpoints used:
-      POST /oauth/token          — Client credentials OAuth2
-      POST /risk-report/query    — Kredi risk raporu
-      GET  /score/inquiry        — KKB Findeks skoru
-      POST /report/detailed      — Detaylı kredi raporu
-    """
 
     TOKEN_PATH = "oauth/token"
 
@@ -51,7 +35,6 @@ class KKBClient(BaseIntegrationClient):
         self._member_code = cfg.kkb_member_code
 
     def _refresh_token(self) -> None:
-        """Obtain OAuth2 client-credentials token from KKB."""
         try:
             with httpx.Client(timeout=self.timeout) as client:
                 resp = client.post(
@@ -78,7 +61,6 @@ class KKBClient(BaseIntegrationClient):
             self._refresh_token()
 
     def get_credit_score(self, national_id: str) -> dict:
-        """Findeks KKB risk skoru sorgusu."""
         self._ensure_token()
         payload = {
             "memberCode": self._member_code,
@@ -89,7 +71,6 @@ class KKBClient(BaseIntegrationClient):
         return self._post("score/inquiry", body=payload)
 
     def get_risk_report(self, national_id: str, report_type: str = "standard") -> dict:
-        """KKB risk raporu (standart / detaylı)."""
         self._ensure_token()
         kkb_report_type = {
             "standard": "STANDARD",
@@ -108,7 +89,6 @@ class KKBClient(BaseIntegrationClient):
 
     def _parse_risk_report(self, raw: dict, national_id: str,
                            report_type: str) -> dict:
-        """Normalize KKB response to our internal format."""
         score_info = raw.get("scoreInfo", {})
         credit_info = raw.get("creditInfo", {})
         payment_info = raw.get("paymentHistory", {})
@@ -137,12 +117,7 @@ class KKBClient(BaseIntegrationClient):
         }
 
 
-# ---------------------------------------------------------------------------
-# Mock fallback
-# ---------------------------------------------------------------------------
-
 def _mock_credit_bureau(national_id: str, report_type: str = "standard") -> dict:
-    """Deterministic mock based on national_id suffix."""
     seed = int(national_id[-4:]) if national_id[-4:].isdigit() else 500
     random.seed(seed)
     score = random.randint(400, 900)
@@ -170,19 +145,10 @@ def _mock_credit_bureau(national_id: str, report_type: str = "standard") -> dict
     }
 
 
-# ---------------------------------------------------------------------------
-# Public interface (used by banking_tools.py)
-# ---------------------------------------------------------------------------
-
 _client: KKBClient | None = None
 
 
 def query_credit_bureau(national_id: str, report_type: str = "standard") -> dict:
-    """
-    Query KKB credit bureau.
-    Uses live API if KKB_CLIENT_ID / KKB_CLIENT_SECRET are set,
-    otherwise falls back to deterministic mock data.
-    """
     cfg = get_config()
     if not cfg.is_kkb_configured():
         logger.debug("KKB not configured — using mock data")

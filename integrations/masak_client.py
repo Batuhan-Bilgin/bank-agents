@@ -1,16 +1,3 @@
-"""
-MASAK (Mali Suçları Araştırma Kurulu) Integration Client
-Turkish Financial Intelligence Unit — AML Reporting & STR Submission
-
-Real API: https://www.masak.gov.tr (institutional access only)
-Requires: MASAK_API_KEY, MASAK_INSTITUTION_CODE env vars
-
-This client handles:
-  1. Suspicious Transaction Report (STR / ŞİT) submission
-  2. Customer risk screening against MASAK watchlists
-  3. CTR (Cash Transaction Report / NBF) submission
-  4. Politically Exposed Persons (PEP) database query
-"""
 import time
 import uuid
 import logging
@@ -28,17 +15,6 @@ def _now() -> str:
 
 
 class MASAKClient(BaseIntegrationClient):
-    """
-    MASAK e-Bildirim / AML API client.
-
-    Endpoints:
-      POST /auth/token           — API key → JWT
-      POST /str/submit           — STR (Şüpheli İşlem Bildirimi)
-      POST /ctr/submit           — CTR (Nakit Bildirim Formu)
-      POST /screening/customer   — AML customer risk screening
-      GET  /pep/query            — PEP database query
-      GET  /watchlist/check      — MASAK izleme listesi
-    """
 
     def __init__(self):
         cfg = get_config()
@@ -55,7 +31,6 @@ class MASAKClient(BaseIntegrationClient):
 
     def submit_str(self, customer_id: str, transaction_data: dict,
                    typologies: list[str], alert_score: float) -> dict:
-        """Submit Suspicious Transaction Report to MASAK."""
         payload = {
             "reportId": f"STR-{uuid.uuid4().hex[:12].upper()}",
             "institutionCode": self._institution_code,
@@ -73,7 +48,6 @@ class MASAKClient(BaseIntegrationClient):
     def screen_customer(self, customer_id: str, screening_type: str,
                         transaction_data: dict | None = None,
                         lookback_days: int = 90) -> dict:
-        """AML behavioral screening."""
         payload = {
             "customerId": customer_id,
             "screeningType": screening_type.upper(),
@@ -85,7 +59,6 @@ class MASAKClient(BaseIntegrationClient):
 
     def check_pep(self, name: str, nationality: str | None = None,
                   date_of_birth: str | None = None) -> dict:
-        """PEP (Politically Exposed Person) database query."""
         params: dict = {"name": name}
         if nationality:
             params["nationality"] = nationality
@@ -94,13 +67,11 @@ class MASAKClient(BaseIntegrationClient):
         return self._get("pep/query", params=params)
 
     def check_watchlist(self, name: str, entity_type: str = "individual") -> dict:
-        """MASAK izleme listesi kontrolü."""
         params = {"name": name, "entityType": entity_type.upper()}
         return self._get("watchlist/check", params=params)
 
     def _parse_screening(self, raw: dict, customer_id: str,
                          screening_type: str, lookback_days: int) -> dict:
-        """Normalize MASAK response."""
         alert_score = raw.get("riskScore", 0.0)
         typologies = raw.get("typologiesDetected", [])
         return {
@@ -116,10 +87,6 @@ class MASAKClient(BaseIntegrationClient):
             "screened_at": _now(),
         }
 
-
-# ---------------------------------------------------------------------------
-# Mock fallback
-# ---------------------------------------------------------------------------
 
 _AML_TYPOLOGIES = [
     "STRUCTURING", "LAYERING_MULTIPLE_ACCOUNTS",
@@ -153,7 +120,7 @@ def _mock_aml_screening(screening_type: str, customer_id: str,
 def _mock_sanctions_check(name: str, entity_type: str = "individual",
                            lists_to_check: list | None = None) -> dict:
     lists = lists_to_check or ["OFAC_SDN", "UN_CONSOLIDATED", "EU_SANCTIONS", "TR_OFFICIAL"]
-    is_hit = random.random() < 0.02  # 2% hit rate
+    is_hit = random.random() < 0.02
     matches = []
     if is_hit:
         matches = [{
@@ -176,19 +143,12 @@ def _mock_sanctions_check(name: str, entity_type: str = "individual",
     }
 
 
-# ---------------------------------------------------------------------------
-# Public interface
-# ---------------------------------------------------------------------------
-
 _client: MASAKClient | None = None
 
 
 def screen_aml(screening_type: str, customer_id: str,
                transaction_data: dict | None = None,
                lookback_days: int = 90) -> dict:
-    """
-    AML screening — MASAK live API or mock fallback.
-    """
     cfg = get_config()
     if not cfg.is_masak_configured():
         logger.debug("MASAK not configured — using mock data")
@@ -210,10 +170,6 @@ def screen_aml(screening_type: str, customer_id: str,
 
 def check_sanctions(name: str, entity_type: str = "individual",
                     lists_to_check: list | None = None, **kwargs) -> dict:
-    """
-    Sanctions screening — MASAK watchlist + international lists.
-    Falls back to mock if not configured.
-    """
     cfg = get_config()
     if not cfg.is_masak_configured():
         return _mock_sanctions_check(name, entity_type, lists_to_check)
@@ -246,7 +202,6 @@ def check_sanctions(name: str, entity_type: str = "individual",
 
 def submit_str_report(customer_id: str, transaction_data: dict,
                       typologies: list[str], alert_score: float) -> dict:
-    """Submit STR to MASAK. Returns submission confirmation or error."""
     cfg = get_config()
     if not cfg.is_masak_configured():
         ref = f"STR-MOCK-{random.randint(100000, 999999)}"

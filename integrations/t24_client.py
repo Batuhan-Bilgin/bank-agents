@@ -1,19 +1,3 @@
-"""
-T24 / Temenos Core Banking Integration Client
-REST API for core banking operations.
-
-Requires: T24_BASE_URL, T24_USERNAME, T24_PASSWORD env vars
-
-API pattern (Temenos Transact REST):
-  Base: http://<host>/irf-provider-container/api/v1.0.0/
-
-Key endpoints:
-  POST /api/v1.0.0/party/customers                    — customer query
-  GET  /api/v1.0.0/holdings/accounts/{accountId}      — account info
-  POST /api/v1.0.0/order/loans/mortgageLoanArrangements — loan query
-  GET  /api/v1.0.0/holdings/transactions/{accountId}  — transactions
-  POST /api/v1.0.0/meta/apis                          — metadata
-"""
 import time
 import base64
 import logging
@@ -41,10 +25,6 @@ def _mask(value: str, visible: int = 4) -> str:
 
 
 class T24Client(BaseIntegrationClient):
-    """
-    Temenos Transact (T24) REST API client.
-    Uses Basic Auth (or JWT depending on T24 version).
-    """
 
     def __init__(self):
         cfg = get_config()
@@ -58,7 +38,6 @@ class T24Client(BaseIntegrationClient):
         self._company_id = cfg.t24_company_id
 
     def _headers(self, extra: dict | None = None) -> dict:
-        """T24 uses Basic Auth."""
         credentials = base64.b64encode(
             f"{self._username}:{self._password}".encode()
         ).decode()
@@ -72,31 +51,17 @@ class T24Client(BaseIntegrationClient):
             h.update(extra)
         return h
 
-    # -----------------------------------------------------------------------
-    # Customer
-    # -----------------------------------------------------------------------
-
     def get_customer(self, customer_id: str) -> dict:
-        """GET /party/customers/{customerId}"""
         return self._get(f"party/customers/{customer_id}")
 
     def search_customers(self, query_params: dict) -> dict:
-        """POST /party/customers with filter"""
         return self._post("party/customers/search", body=query_params)
-
-    # -----------------------------------------------------------------------
-    # Accounts
-    # -----------------------------------------------------------------------
 
     def get_account(self, account_id: str) -> dict:
         return self._get(f"holdings/accounts/{account_id}")
 
     def get_accounts_for_customer(self, customer_id: str) -> dict:
         return self._get("holdings/accounts", params={"customerId": customer_id})
-
-    # -----------------------------------------------------------------------
-    # Transactions
-    # -----------------------------------------------------------------------
 
     def get_transactions(self, account_id: str,
                          date_from: str | None = None,
@@ -109,17 +74,9 @@ class T24Client(BaseIntegrationClient):
             params["endDate"] = date_to
         return self._get(f"holdings/transactions/{account_id}", params=params)
 
-    # -----------------------------------------------------------------------
-    # Loans
-    # -----------------------------------------------------------------------
-
     def get_loans_for_customer(self, customer_id: str) -> dict:
         return self._get("order/loans/arrangements",
                          params={"customerId": customer_id})
-
-    # -----------------------------------------------------------------------
-    # Response normalization
-    # -----------------------------------------------------------------------
 
     def _normalize_customer(self, raw: dict, customer_id: str) -> dict:
         body = raw.get("body", [raw])[0] if isinstance(raw.get("body"), list) else raw
@@ -167,10 +124,6 @@ class T24Client(BaseIntegrationClient):
 
     def execute_sql_like_query(self, query: str, database: str,
                                limit: int = 100) -> dict:
-        """
-        Map SQL-style queries to T24 REST calls.
-        T24 doesn't support raw SQL — we parse keywords and route to endpoints.
-        """
         query_lower = query.lower()
         if "customer" in query_lower:
             raw = self._get("party/customers", params={"page_size": limit})
@@ -196,10 +149,6 @@ class T24Client(BaseIntegrationClient):
             "executed_at": _now(),
         }
 
-
-# ---------------------------------------------------------------------------
-# Mock fallbacks
-# ---------------------------------------------------------------------------
 
 def _mock_database_query(query: str, database: str, limit: int = 100) -> dict:
     query_lower = query.lower()
@@ -309,15 +258,10 @@ def _mock_transactions(customer_id: str, limit: int = 50,
     }
 
 
-# ---------------------------------------------------------------------------
-# Public interface
-# ---------------------------------------------------------------------------
-
 _client: T24Client | None = None
 
 
 def query_core_banking(query: str, database: str, limit: int = 100) -> dict:
-    """Execute a query against T24 core banking system."""
     cfg = get_config()
     if not cfg.is_t24_configured():
         logger.debug("T24 not configured — using mock data")
@@ -337,7 +281,6 @@ def query_core_banking(query: str, database: str, limit: int = 100) -> dict:
 
 
 def get_customer_360(customer_id: str, include_sections: list | None = None) -> dict:
-    """Full 360-degree customer view from T24."""
     cfg = get_config()
     if not cfg.is_t24_configured():
         return _mock_customer_360(customer_id)
@@ -350,7 +293,6 @@ def get_customer_360(customer_id: str, include_sections: list | None = None) -> 
         raw = _client.get_customer(customer_id)
         base = _client._normalize_customer(raw, customer_id)
 
-        # Supplement with account & transaction data if requested
         if not include_sections or "products" in include_sections:
             accts = _client.get_accounts_for_customer(customer_id)
             base["products"] = {"accounts": accts.get("body", [])}
@@ -364,7 +306,6 @@ def get_customer_360(customer_id: str, include_sections: list | None = None) -> 
 
 
 def get_transaction_history(customer_id: str, **kwargs) -> dict:
-    """Transaction history from T24 or mock."""
     cfg = get_config()
     limit = kwargs.get("limit", 50)
     channel = kwargs.get("channel", "all")
@@ -377,7 +318,6 @@ def get_transaction_history(customer_id: str, **kwargs) -> dict:
         _client = T24Client()
 
     try:
-        # Get first account for customer then query its transactions
         accts = _client.get_accounts_for_customer(customer_id)
         accounts = accts.get("body", [])
         if not accounts:

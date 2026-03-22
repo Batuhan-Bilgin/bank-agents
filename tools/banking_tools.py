@@ -1,8 +1,3 @@
-"""
-Banking core tools — database, credit, risk, payments, SWIFT.
-Uses real integration clients (KKB, T24, TCMB) when credentials are configured.
-Falls back to deterministic mock data in development.
-"""
 
 import json
 import random
@@ -10,7 +5,6 @@ import hashlib
 from datetime import datetime, timedelta
 from typing import Any
 
-# Real integration clients (lazy import to avoid import errors when not installed)
 try:
     from integrations.kkb_client import query_credit_bureau as _kkb_query
     from integrations.t24_client import (
@@ -24,24 +18,15 @@ except ImportError:
     _INTEGRATIONS_AVAILABLE = False
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
 def _now() -> str:
     return datetime.utcnow().isoformat() + "Z"
 
 
 def _mask(value: str, visible: int = 4) -> str:
-    """Mask sensitive strings, keep last N chars visible."""
     if len(value) <= visible:
         return "*" * len(value)
     return "*" * (len(value) - visible) + value[-visible:]
 
-
-# ---------------------------------------------------------------------------
-# Tool: database_query
-# ---------------------------------------------------------------------------
 
 TOOL_DATABASE_QUERY = {
     "name": "database_query",
@@ -73,11 +58,9 @@ TOOL_DATABASE_QUERY = {
 
 
 def execute_database_query(query: str, database: str, limit: int = 100) -> dict:
-    """Execute SQL query — routes to T24 core banking REST API or mock fallback."""
     if _INTEGRATIONS_AVAILABLE:
         return _t24_query(query, database, limit)
 
-    # Pure mock fallback
     query_lower = query.lower()
     rows = []
     if "customer" in query_lower:
@@ -118,10 +101,6 @@ def execute_database_query(query: str, database: str, limit: int = 100) -> dict:
     }
 
 
-# ---------------------------------------------------------------------------
-# Tool: customer_360_lookup
-# ---------------------------------------------------------------------------
-
 TOOL_CUSTOMER_360 = {
     "name": "customer_360_lookup",
     "description": (
@@ -149,7 +128,6 @@ TOOL_CUSTOMER_360 = {
 
 
 def execute_customer_360(customer_id: str, include_sections: list | None = None) -> dict:
-    """Customer 360 — routes to T24 or mock."""
     if _INTEGRATIONS_AVAILABLE:
         return _t24_customer_360(customer_id, include_sections)
     seed = int(hashlib.md5(customer_id.encode()).hexdigest(), 16) % 1000
@@ -193,10 +171,6 @@ def execute_customer_360(customer_id: str, include_sections: list | None = None)
     }
 
 
-# ---------------------------------------------------------------------------
-# Tool: transaction_history
-# ---------------------------------------------------------------------------
-
 TOOL_TRANSACTION_HISTORY = {
     "name": "transaction_history",
     "description": "Retrieve transaction history for a customer or account with filtering options.",
@@ -220,7 +194,6 @@ TOOL_TRANSACTION_HISTORY = {
 
 
 def execute_transaction_history(customer_id: str, **kwargs) -> dict:
-    """Transaction history — routes to T24 or mock."""
     if _INTEGRATIONS_AVAILABLE:
         return _t24_transactions(customer_id, **kwargs)
     limit = kwargs.get("limit", 50)
@@ -248,10 +221,6 @@ def execute_transaction_history(customer_id: str, **kwargs) -> dict:
     }
 
 
-# ---------------------------------------------------------------------------
-# Tool: credit_bureau_api
-# ---------------------------------------------------------------------------
-
 TOOL_CREDIT_BUREAU = {
     "name": "credit_bureau_api",
     "description": "Query KKB (Credit Bureau) for customer credit history, score, and existing credit obligations.",
@@ -272,10 +241,8 @@ TOOL_CREDIT_BUREAU = {
 
 
 def execute_credit_bureau(national_id: str, report_type: str = "standard", **kwargs) -> dict:
-    """Query KKB credit bureau — uses real API if KKB credentials configured."""
     if _INTEGRATIONS_AVAILABLE:
         return _kkb_query(national_id, report_type)
-    # Pure mock fallback
     seed = int(national_id[-4:]) if national_id[-4:].isdigit() else 500
     random.seed(seed)
     score = random.randint(400, 900)
@@ -302,10 +269,6 @@ def execute_credit_bureau(national_id: str, report_type: str = "standard", **kwa
         "report_type": report_type,
     }
 
-
-# ---------------------------------------------------------------------------
-# Tool: risk_scoring_engine
-# ---------------------------------------------------------------------------
 
 TOOL_RISK_SCORING = {
     "name": "risk_scoring_engine",
@@ -360,10 +323,6 @@ def execute_risk_scoring(model_type: str, input_features: dict, explain: bool = 
     return result
 
 
-# ---------------------------------------------------------------------------
-# Tool: payment_gateway
-# ---------------------------------------------------------------------------
-
 TOOL_PAYMENT_GATEWAY = {
     "name": "payment_gateway",
     "description": (
@@ -414,10 +373,6 @@ def execute_payment_gateway(payment_type: str, amount: float, currency: str,
         "processed_at": _now()
     }
 
-
-# ---------------------------------------------------------------------------
-# Tool: swift_api
-# ---------------------------------------------------------------------------
 
 TOOL_SWIFT = {
     "name": "swift_api",
@@ -473,10 +428,6 @@ def execute_swift_api(action: str, message_type: str | None = None,
     return {"success": False, "error": f"Unknown action: {action}"}
 
 
-# ---------------------------------------------------------------------------
-# Tool: collateral_valuation
-# ---------------------------------------------------------------------------
-
 TOOL_COLLATERAL_VALUATION = {
     "name": "collateral_valuation",
     "description": "Retrieve or request valuation of collateral assets pledged against credit facilities.",
@@ -520,10 +471,6 @@ def execute_collateral_valuation(collateral_id: str, collateral_type: str,
         "retrieved_at": _now()
     }
 
-
-# ---------------------------------------------------------------------------
-# Tool: stress_test_engine
-# ---------------------------------------------------------------------------
 
 TOOL_STRESS_TEST = {
     "name": "stress_test_engine",
@@ -584,10 +531,6 @@ def execute_stress_test(scenario_type: str, portfolio_scope: str = "total",
     }
 
 
-# ---------------------------------------------------------------------------
-# Tool: portfolio_analytics
-# ---------------------------------------------------------------------------
-
 TOOL_PORTFOLIO_ANALYTICS = {
     "name": "portfolio_analytics",
     "description": "Calculate portfolio-level analytics including performance, risk metrics, and attribution.",
@@ -643,10 +586,6 @@ def execute_portfolio_analytics(portfolio_id: str, metric: str,
     return base
 
 
-# ---------------------------------------------------------------------------
-# Tool: ml_model_inference
-# ---------------------------------------------------------------------------
-
 TOOL_ML_INFERENCE = {
     "name": "ml_model_inference",
     "description": "Run inference against deployed ML models in the model registry.",
@@ -682,10 +621,6 @@ def execute_ml_inference(model_name: str, features: dict,
     return result
 
 
-# ---------------------------------------------------------------------------
-# Tool: market_data_feed
-# ---------------------------------------------------------------------------
-
 TOOL_MARKET_DATA = {
     "name": "market_data_feed",
     "description": "Retrieve real-time or historical market data including equity prices, bond yields, and indices.",
@@ -710,7 +645,6 @@ TOOL_MARKET_DATA = {
 
 
 def execute_market_data(symbols: list, data_type: str = "realtime", period: str | None = None) -> dict:
-    """Market data — FX pairs come from TCMB EVDS when configured."""
     if _INTEGRATIONS_AVAILABLE:
         return _tcmb_market(symbols, data_type, period)
     base_prices = {"BIST100": 9500, "USDTRY": 38.5, "EURTRY": 41.2,
@@ -728,10 +662,6 @@ def execute_market_data(symbols: list, data_type: str = "realtime", period: str 
         }
     return {"data_type": data_type, "quotes": data, "source": "MOCK"}
 
-
-# ---------------------------------------------------------------------------
-# Tool: fx_rate_api
-# ---------------------------------------------------------------------------
 
 TOOL_FX_RATE = {
     "name": "fx_rate_api",
@@ -755,7 +685,6 @@ TOOL_FX_RATE = {
 
 def execute_fx_rate(base_currency: str, quote_currency: str,
                     amount: float | None = None, tenor: str = "spot") -> dict:
-    """FX rate — live TCMB EVDS API when API key configured, otherwise reference rates."""
     if _INTEGRATIONS_AVAILABLE:
         return _tcmb_fx(base_currency, quote_currency, amount, tenor)
     rates = {("USD", "TRY"): 38.50, ("EUR", "TRY"): 41.20,

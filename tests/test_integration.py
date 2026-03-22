@@ -1,10 +1,3 @@
-"""
-BankAI Integration Tests — validates the full stack without making real API calls.
-Uses mock patching to simulate Claude API responses.
-
-Run: python -m pytest tests/test_integration.py -v
-  or: python tests/test_integration.py
-"""
 
 import json
 import sys
@@ -13,12 +6,10 @@ import unittest
 from unittest.mock import patch, MagicMock
 from pathlib import Path
 
-# Ensure project root is in path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 
 def make_mock_response(text: str, stop_reason: str = "end_turn"):
-    """Create a minimal mock Anthropic Message object."""
     text_block = MagicMock()
     text_block.type = "text"
     text_block.text = text
@@ -30,7 +21,6 @@ def make_mock_response(text: str, stop_reason: str = "end_turn"):
 
 
 def make_mock_tool_response(tool_name: str, tool_input: dict, tool_id: str = "toolu_test001"):
-    """Create a mock response that requests a tool call, then final text."""
     tool_block = MagicMock()
     tool_block.type = "tool_use"
     tool_block.name = tool_name
@@ -194,10 +184,8 @@ class TestAutoRouting(unittest.TestCase):
 
 
 class TestBaseAgent(unittest.TestCase):
-    """Tests BaseAgent using mocked Claude API calls (forces PROVIDER=anthropic)."""
 
     def _get_fraud_agent(self):
-        # Force anthropic provider so BaseAgent is used (not GroqBaseAgent)
         with patch.dict(os.environ, {"PROVIDER": "anthropic"}):
             from core.agent_factory import AgentFactory, CONFIG_PATH
             factory = AgentFactory(CONFIG_PATH)
@@ -211,7 +199,6 @@ class TestBaseAgent(unittest.TestCase):
 
     @patch("core.base_agent.anthropic.Anthropic")
     def test_simple_chat_no_tools(self, MockAnthropic):
-        """Test a simple chat response with no tool calls."""
         mock_client = MagicMock()
         MockAnthropic.return_value = mock_client
         mock_client.messages.create.return_value = make_mock_response(
@@ -219,7 +206,7 @@ class TestBaseAgent(unittest.TestCase):
         )
 
         agent = self._get_credit_agent()
-        agent._client = mock_client  # inject mock directly
+        agent._client = mock_client
 
         result = agent.chat("Assess credit risk for customer C001", verbose=False)
         self.assertIn("750", result)
@@ -227,11 +214,9 @@ class TestBaseAgent(unittest.TestCase):
 
     @patch("core.base_agent.anthropic.Anthropic")
     def test_chat_with_tool_call(self, MockAnthropic):
-        """Test the agentic loop with one tool call followed by final response."""
         mock_client = MagicMock()
         MockAnthropic.return_value = mock_client
 
-        # First call: request tool use
         mock_client.messages.create.side_effect = [
             make_mock_tool_response(
                 "fraud_detection_api",
@@ -239,7 +224,6 @@ class TestBaseAgent(unittest.TestCase):
                  "customer_id": "C001", "merchant_category": "transfer",
                  "transaction_type": "wire_transfer"}
             ),
-            # Second call: final answer after tool result
             make_mock_response("HIGH RISK: Transaction flagged for manual review."),
         ]
 
@@ -267,7 +251,7 @@ class TestBaseAgent(unittest.TestCase):
         prompt = agent._build_system_prompt()
         self.assertIn("Credit Risk Analyst", prompt)
         self.assertIn("BankAI", prompt)
-        self.assertIn("BDDK", prompt)  # compliance flag
+        self.assertIn("BDDK", prompt)
 
 
 class TestOrchestrator(unittest.TestCase):
@@ -283,7 +267,6 @@ class TestOrchestrator(unittest.TestCase):
             from core.orchestrator import Orchestrator
             orch = Orchestrator()
 
-            # Inject mock inside the patch so BaseAgent is created (not GroqBaseAgent)
             for aid in ["npl_manager_007", "collateral_evaluator_005"]:
                 orch._factory.get(aid)._client = mock_client
 
@@ -298,7 +281,6 @@ class TestOrchestrator(unittest.TestCase):
 
 
 class TestAPIServer(unittest.TestCase):
-    """Tests the FastAPI server endpoints (no real API calls)."""
 
     def setUp(self):
         from fastapi.testclient import TestClient
@@ -349,7 +331,6 @@ class TestAPIServer(unittest.TestCase):
         self.assertEqual(stats["total_agents"], 100)
 
     def test_chat_without_api_key_503(self):
-        """Should return 503 if API key not configured."""
         with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "your_api_key_here"}):
             resp = self.client.post(
                 "/agents/credit_risk_analyst_001/chat",
@@ -364,7 +345,6 @@ class TestAPIServer(unittest.TestCase):
 
 
 def run_tests():
-    """Run all tests and print summary."""
     loader = unittest.TestLoader()
     suite = unittest.TestSuite()
 
