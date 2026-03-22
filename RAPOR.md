@@ -39,7 +39,7 @@ BankAI, Türk bankacılık operasyonları için geliştirilmiş 80 ajanından ol
                                         │
 ┌───────────────────────────────────────▼─────────────────────┐
 │                     Integrations                            │
-│  KKB · MASAK · T24 · TCMB/EVDS3 · SWIFT                    │
+│  KKB · MASAK · BOA · TCMB/EVDS3 · SWIFT                    │
 │  (Canlı HTTP bağlantısı veya deterministik mock fallback)   │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -187,7 +187,7 @@ Toplam **43 araç** kayıtlı. Her araç: bir JSON şema (LLM'e açıklama) + bi
 
 | Araç | Fonksiyon | Açıklama |
 |------|-----------|----------|
-| `database_query` | `execute_database_query` | T24 core banking SQL benzeri sorgu |
+| `database_query` | `execute_database_query` | BOA core banking SQL benzeri sorgu |
 | `customer_360_lookup` | `execute_customer_360` | Müşteri 360 profili |
 | `transaction_history` | `execute_transaction_history` | İşlem geçmişi |
 | `credit_bureau_api` | `execute_credit_bureau` | KKB kredi bürosu sorgusu |
@@ -274,19 +274,18 @@ Her entegrasyon: canlı HTTP bağlantısı (kimlik bilgisi varsa) veya determini
 
 **Tespit edilen tipologiler (8):** STRUCTURING, LAYERING, RAPID_FUND_MOVEMENT, HIGH_RISK_JURISDICTION, ROUND_AMOUNT_PATTERN, CASH_INTENSIVE_BUSINESS, SUSPICIOUS_WIRE_TRANSFER, SMURFING
 
-### 6.4 T24 / Temenos Core Banking
+### 6.4 BOA Core Banking
 
-**Endpoint:** `http://<host>:9089/irf-provider-container/api`
-**Auth:** HTTP Basic Auth + `X-T24-Company` header
-**Ortam değişkenleri:** `T24_BASE_URL`, `T24_USERNAME`, `T24_PASSWORD`, `T24_COMPANY_ID`
+**Endpoint:** `http://<host>:8080/api` (yapılandırılacak)
+**Auth:** Belirlenmedi — BOA API detayları netleşince eklenecek
+**Ortam değişkenleri:** `BOA_BASE_URL`, `BOA_USERNAME`, `BOA_PASSWORD`, `BOA_API_KEY`
 
-| Metot | Endpoint |
-|-------|----------|
-| `get_customer()` | `GET /party/customers/{id}` |
-| `get_accounts_for_customer()` | `GET /holdings/accounts?customerId=` |
-| `get_transactions()` | `GET /holdings/accounts/{id}/entries` |
-| `get_loans_for_customer()` | `GET /order/loans/arrangements` |
-| `execute_sql_like_query()` | SQL metnini T24 REST'e eşler |
+| Metot | Durum |
+|-------|-------|
+| `get_customer()` | Bağlantı bekleniyor |
+| `get_accounts_for_customer()` | Bağlantı bekleniyor |
+| `get_transactions()` | Bağlantı bekleniyor |
+| `get_loans_for_customer()` | Bağlantı bekleniyor |
 
 ### 6.5 TCMB — Türkiye Cumhuriyet Merkez Bankası
 
@@ -365,7 +364,7 @@ Desteklenen dövizler: USD, EUR, GBP, CHF, JPY, SAR, AED, AUD, CAD, CNY, DKK, NO
 | Dosya | Sınıf | Test Sayısı | Kapsam |
 |-------|-------|-------------|--------|
 | `test_integration.py` | TestToolRegistry, TestBaseAgent, TestOrchestrator, TestAPIServer | ~40 | Core agent, tool execution, API |
-| `test_integrations.py` | TestIntegrationConfig, TestKKBClient, TestMASAKClient, TestT24Client, TestTCMBClient, TestToolsUseIntegrations | ~28 | Entegrasyon katmanı, mock fallback'ler |
+| `test_integrations.py` | TestIntegrationConfig, TestKKBClient, TestMASAKClient, TestBOAClient, TestTCMBClient, TestToolsUseIntegrations | ~28 | Entegrasyon katmanı, mock fallback'ler |
 
 Testler gerçek HTTP çağrısı yapmaz; entegrasyonlar mock mod üzerinden test edilir.
 
@@ -386,9 +385,9 @@ Testler gerçek HTTP çağrısı yapmaz; entegrasyonlar mock mod üzerinden test
 | `KKB_MEMBER_CODE` | Hayır | KKB üye kodu |
 | `MASAK_API_KEY` | Hayır | MASAK API anahtarı |
 | `MASAK_INSTITUTION_CODE` | Hayır | MASAK kurum kodu |
-| `T24_BASE_URL` | Hayır | T24 REST API adresi |
-| `T24_USERNAME` | Hayır | T24 kullanıcı adı |
-| `T24_PASSWORD` | Hayır | T24 şifresi |
+| `BOA_BASE_URL` | Hayır | BOA REST API adresi |
+| `BOA_USERNAME` | Hayır | BOA kullanıcı adı |
+| `BOA_PASSWORD` | Hayır | BOA şifresi |
 | `USE_MOCK_INTEGRATIONS` | Hayır | `true`/`false` (varsayılan: `true`) |
 | `INTEGRATION_HTTP_TIMEOUT` | Hayır | HTTP zaman aşımı saniye (varsayılan: 15) |
 | `INTEGRATION_HTTP_RETRIES` | Hayır | Yeniden deneme sayısı (varsayılan: 3) |
@@ -431,7 +430,7 @@ bank_agents/
 │   ├── base_client.py          # HTTP istemci temeli
 │   ├── kkb_client.py           # Kredi Kayıt Bürosu
 │   ├── masak_client.py         # AML/MASAK
-│   ├── t24_client.py           # Core Banking (Temenos T24)
+│   ├── boa_client.py           # Core Banking (BOA)
 │   └── tcmb_client.py          # TCMB döviz + EVDS3
 ├── tools/
 │   ├── banking_tools.py        # 13 bankacılık aracı
