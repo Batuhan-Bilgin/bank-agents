@@ -30,17 +30,17 @@ class IntegrationConfig:
         default_factory=lambda: os.getenv("MASAK_INSTITUTION_CODE")
     )
 
-    t24_base_url: str = field(
-        default_factory=lambda: os.getenv("T24_BASE_URL", "http://localhost:9089/irf-provider-container/api")
+    boa_base_url: str = field(
+        default_factory=lambda: os.getenv("BOA_BASE_URL", "http://localhost:8080/api")
     )
-    t24_username: str | None = field(
-        default_factory=lambda: os.getenv("T24_USERNAME")
+    boa_username: str | None = field(
+        default_factory=lambda: os.getenv("BOA_USERNAME")
     )
-    t24_password: str | None = field(
-        default_factory=lambda: os.getenv("T24_PASSWORD")
+    boa_password: str | None = field(
+        default_factory=lambda: os.getenv("BOA_PASSWORD")
     )
-    t24_company_id: str = field(
-        default_factory=lambda: os.getenv("T24_COMPANY_ID", "TR0010001")
+    boa_api_key: str | None = field(
+        default_factory=lambda: os.getenv("BOA_API_KEY")
     )
 
     tcmb_username: str | None = field(
@@ -82,8 +82,8 @@ class IntegrationConfig:
     def is_masak_configured(self) -> bool:
         return bool(self.masak_api_key and self.masak_institution_code)
 
-    def is_t24_configured(self) -> bool:
-        return bool(self.t24_username and self.t24_password)
+    def is_boa_configured(self) -> bool:
+        return bool(self.boa_username and self.boa_password)
 
     def is_tcmb_configured(self) -> bool:
         return bool(self.tcmb_username and self.tcmb_password)
@@ -95,7 +95,7 @@ class IntegrationConfig:
         return {
             "kkb": "LIVE" if self.is_kkb_configured() else "MOCK",
             "masak": "LIVE" if self.is_masak_configured() else "MOCK",
-            "t24": "LIVE" if self.is_t24_configured() else "MOCK",
+            "boa": "LIVE" if self.is_boa_configured() else "MOCK",
             "tcmb": "LIVE" if self.is_tcmb_configured() else "MOCK",
             "swift": "LIVE" if self.is_swift_configured() else "MOCK",
         }

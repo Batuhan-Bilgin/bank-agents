@@ -361,7 +361,7 @@ TOOL_DATA_LINEAGE = {
 
 def execute_data_lineage(data_element: str, direction: str = "both", depth: int = 3) -> dict:
     upstream = [
-        {"system": "Core Banking (T24)", "table": f"T24_{data_element.upper()}", "hop": 1},
+        {"system": "Core Banking (BOA)", "table": f"BOA_{data_element.upper()}", "hop": 1},
         {"system": "ETL Layer", "table": f"STG_{data_element.upper()}", "hop": 2}
     ]
     downstream = [

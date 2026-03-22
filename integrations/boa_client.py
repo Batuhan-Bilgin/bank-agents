@@ -24,18 +24,18 @@ def _mask(value: str, visible: int = 4) -> str:
     return "*" * (len(value) - visible) + value[-visible:]
 
 
-class T24Client(BaseIntegrationClient):
+class BOAClient(BaseIntegrationClient):
 
     def __init__(self):
         cfg = get_config()
         super().__init__(
-            base_url=cfg.t24_base_url,
+            base_url=cfg.boa_base_url,
             timeout=cfg.http_timeout,
             max_retries=cfg.http_retries,
         )
-        self._username = cfg.t24_username
-        self._password = cfg.t24_password
-        self._company_id = cfg.t24_company_id
+        self._username = cfg.boa_username
+        self._password = cfg.boa_password
+        self._company_id = cfg.boa_company_id
 
     def _headers(self, extra: dict | None = None) -> dict:
         credentials = base64.b64encode(
@@ -45,7 +45,7 @@ class T24Client(BaseIntegrationClient):
             "Content-Type": "application/json",
             "Accept": "application/json",
             "Authorization": f"Basic {credentials}",
-            "X-T24-Company": self._company_id,
+            "X-BOA-Company": self._company_id,
         }
         if extra:
             h.update(extra)
@@ -82,7 +82,7 @@ class T24Client(BaseIntegrationClient):
         body = raw.get("body", [raw])[0] if isinstance(raw.get("body"), list) else raw
         return {
             "customer_id": customer_id,
-            "source": "LIVE_T24",
+            "source": "LIVE_BOA",
             "name": body.get("customerName", ""),
             "segment": body.get("customerSegment", ""),
             "since": body.get("dateJoined", ""),
@@ -116,7 +116,7 @@ class T24Client(BaseIntegrationClient):
             })
         return {
             "customer_id": customer_id,
-            "source": "LIVE_T24",
+            "source": "LIVE_BOA",
             "transaction_count": len(txns),
             "transactions": txns,
             "retrieved_at": _now(),
@@ -135,14 +135,14 @@ class T24Client(BaseIntegrationClient):
         elif "account" in query_lower:
             raw = self._get("holdings/accounts", params={"page_size": limit})
         else:
-            return {"success": True, "source": "LIVE_T24",
+            return {"success": True, "source": "LIVE_BOA",
                     "database": database, "rows": [],
-                    "note": "Query type not mapped to T24 endpoint"}
+                    "note": "Query type not mapped to BOA endpoint"}
 
         rows = raw.get("body", [])
         return {
             "success": True,
-            "source": "LIVE_T24",
+            "source": "LIVE_BOA",
             "database": database,
             "row_count": len(rows),
             "rows": rows[:limit],
@@ -258,23 +258,23 @@ def _mock_transactions(customer_id: str, limit: int = 50,
     }
 
 
-_client: T24Client | None = None
+_client: BOAClient | None = None
 
 
 def query_core_banking(query: str, database: str, limit: int = 100) -> dict:
     cfg = get_config()
-    if not cfg.is_t24_configured():
-        logger.debug("T24 not configured — using mock data")
+    if not cfg.is_boa_configured():
+        logger.debug("BOA not configured — using mock data")
         return _mock_database_query(query, database, limit)
 
     global _client
     if _client is None:
-        _client = T24Client()
+        _client = BOAClient()
 
     try:
         return _client.execute_sql_like_query(query, database, limit)
     except Exception as exc:
-        logger.warning("T24 live call failed (%s) — falling back to mock", exc)
+        logger.warning("BOA live call failed (%s) — falling back to mock", exc)
         result = _mock_database_query(query, database, limit)
         result["fallback_reason"] = str(exc)
         return result
@@ -282,12 +282,12 @@ def query_core_banking(query: str, database: str, limit: int = 100) -> dict:
 
 def get_customer_360(customer_id: str, include_sections: list | None = None) -> dict:
     cfg = get_config()
-    if not cfg.is_t24_configured():
+    if not cfg.is_boa_configured():
         return _mock_customer_360(customer_id)
 
     global _client
     if _client is None:
-        _client = T24Client()
+        _client = BOAClient()
 
     try:
         raw = _client.get_customer(customer_id)
@@ -299,7 +299,7 @@ def get_customer_360(customer_id: str, include_sections: list | None = None) -> 
 
         return base
     except Exception as exc:
-        logger.warning("T24 customer 360 failed (%s) — falling back to mock", exc)
+        logger.warning("BOA customer 360 failed (%s) — falling back to mock", exc)
         result = _mock_customer_360(customer_id)
         result["fallback_reason"] = str(exc)
         return result
@@ -310,12 +310,12 @@ def get_transaction_history(customer_id: str, **kwargs) -> dict:
     limit = kwargs.get("limit", 50)
     channel = kwargs.get("channel", "all")
 
-    if not cfg.is_t24_configured():
+    if not cfg.is_boa_configured():
         return _mock_transactions(customer_id, limit, channel)
 
     global _client
     if _client is None:
-        _client = T24Client()
+        _client = BOAClient()
 
     try:
         accts = _client.get_accounts_for_customer(customer_id)
@@ -331,7 +331,7 @@ def get_transaction_history(customer_id: str, **kwargs) -> dict:
         )
         return _client._normalize_transactions(raw, customer_id, limit)
     except Exception as exc:
-        logger.warning("T24 transactions failed (%s) — falling back to mock", exc)
+        logger.warning("BOA transactions failed (%s) — falling back to mock", exc)
         result = _mock_transactions(customer_id, limit, channel)
         result["fallback_reason"] = str(exc)
         return result

@@ -7,10 +7,10 @@ from typing import Any
 
 try:
     from integrations.kkb_client import query_credit_bureau as _kkb_query
-    from integrations.t24_client import (
-        query_core_banking as _t24_query,
-        get_customer_360 as _t24_customer_360,
-        get_transaction_history as _t24_transactions,
+    from integrations.boa_client import (
+        query_core_banking as _boa_query,
+        get_customer_360 as _boa_customer_360,
+        get_transaction_history as _boa_transactions,
     )
     from integrations.tcmb_client import get_fx_rate as _tcmb_fx, get_market_data as _tcmb_market
     _INTEGRATIONS_AVAILABLE = True
@@ -59,7 +59,7 @@ TOOL_DATABASE_QUERY = {
 
 def execute_database_query(query: str, database: str, limit: int = 100) -> dict:
     if _INTEGRATIONS_AVAILABLE:
-        return _t24_query(query, database, limit)
+        return _boa_query(query, database, limit)
 
     query_lower = query.lower()
     rows = []
@@ -129,7 +129,7 @@ TOOL_CUSTOMER_360 = {
 
 def execute_customer_360(customer_id: str, include_sections: list | None = None) -> dict:
     if _INTEGRATIONS_AVAILABLE:
-        return _t24_customer_360(customer_id, include_sections)
+        return _boa_customer_360(customer_id, include_sections)
     seed = int(hashlib.md5(customer_id.encode()).hexdigest(), 16) % 1000
     random.seed(seed)
     return {
@@ -195,7 +195,7 @@ TOOL_TRANSACTION_HISTORY = {
 
 def execute_transaction_history(customer_id: str, **kwargs) -> dict:
     if _INTEGRATIONS_AVAILABLE:
-        return _t24_transactions(customer_id, **kwargs)
+        return _boa_transactions(customer_id, **kwargs)
     limit = kwargs.get("limit", 50)
     channel = kwargs.get("channel", "all")
     channels = ["ATM", "Internet", "Mobile", "Branch", "POS", "Wire"]

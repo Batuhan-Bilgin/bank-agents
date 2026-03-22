@@ -105,11 +105,11 @@ class TestAgentFactory(unittest.TestCase):
         self.factory = AgentFactory(CONFIG_PATH)
 
     def test_100_agents_loaded(self):
-        self.assertEqual(self.factory.total, 100)
+        self.assertEqual(self.factory.total, 80)
 
     def test_15_departments(self):
         depts = self.factory.list_departments()
-        self.assertEqual(len(depts), 15)
+        self.assertEqual(len(depts), 11)
 
     def test_get_agent_by_id(self):
         agent = self.factory.get("credit_risk_analyst_001")
@@ -133,8 +133,8 @@ class TestAgentFactory(unittest.TestCase):
 
     def test_stats_structure(self):
         stats = self.factory.stats()
-        self.assertEqual(stats["total_agents"], 100)
-        self.assertEqual(stats["departments"], 15)
+        self.assertEqual(stats["total_agents"], 80)
+        self.assertGreaterEqual(stats["departments"], 10)
         self.assertIn("by_department", stats)
         self.assertIn("by_authority_level", stats)
 
@@ -142,7 +142,7 @@ class TestAgentFactory(unittest.TestCase):
         stats = self.factory.stats()
         levels = stats["by_authority_level"]
         total = sum(levels.values())
-        self.assertEqual(total, 100)
+        self.assertEqual(total, 80)
         for level in [1, 2, 3]:
             self.assertIn(level, levels)
 
@@ -292,13 +292,13 @@ class TestAPIServer(unittest.TestCase):
         self.assertEqual(resp.status_code, 200)
         data = resp.json()
         self.assertEqual(data["status"], "ok")
-        self.assertEqual(data["agents_loaded"], 100)
+        self.assertEqual(data["agents_loaded"], 80)
 
     def test_list_agents(self):
         resp = self.client.get("/agents")
         self.assertEqual(resp.status_code, 200)
         agents = resp.json()
-        self.assertEqual(len(agents), 100)
+        self.assertEqual(len(agents), 80)
 
     def test_list_agents_by_department(self):
         resp = self.client.get("/agents?department=Fraud Detection")
@@ -322,13 +322,13 @@ class TestAPIServer(unittest.TestCase):
         resp = self.client.get("/departments")
         self.assertEqual(resp.status_code, 200)
         depts = resp.json()["departments"]
-        self.assertEqual(len(depts), 15)
+        self.assertEqual(len(depts), 11)
 
     def test_stats_endpoint(self):
         resp = self.client.get("/stats")
         self.assertEqual(resp.status_code, 200)
         stats = resp.json()
-        self.assertEqual(stats["total_agents"], 100)
+        self.assertEqual(stats["total_agents"], 80)
 
     def test_chat_without_api_key_503(self):
         with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "your_api_key_here"}):

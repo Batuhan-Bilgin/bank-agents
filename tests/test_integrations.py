@@ -15,13 +15,13 @@ class TestIntegrationConfig(unittest.TestCase):
         cfg = IntegrationConfig()
         self.assertIsNotNone(cfg.kkb_base_url)
         self.assertIsNotNone(cfg.masak_base_url)
-        self.assertIsNotNone(cfg.t24_base_url)
+        self.assertIsNotNone(cfg.boa_base_url)
 
     def test_all_unconfigured_by_default(self):
         with patch.dict(os.environ, {}, clear=False):
             keys = ["KKB_CLIENT_ID", "KKB_CLIENT_SECRET",
                     "MASAK_API_KEY", "MASAK_INSTITUTION_CODE",
-                    "T24_USERNAME", "T24_PASSWORD",
+                    "BOA_USERNAME", "BOA_PASSWORD",
                     "TCMB_API_KEY", "TCMB_USERNAME", "TCMB_PASSWORD",
                     "SWIFT_CONSUMER_KEY", "SWIFT_CONSUMER_SECRET"]
             clean_env = {k: v for k, v in os.environ.items() if k not in keys}
@@ -30,7 +30,7 @@ class TestIntegrationConfig(unittest.TestCase):
                 cfg = IntegrationConfig()
                 self.assertFalse(cfg.is_kkb_configured())
                 self.assertFalse(cfg.is_masak_configured())
-                self.assertFalse(cfg.is_t24_configured())
+                self.assertFalse(cfg.is_boa_configured())
                 self.assertFalse(cfg.is_tcmb_configured())
                 self.assertFalse(cfg.is_swift_configured())
 
@@ -49,7 +49,7 @@ class TestIntegrationConfig(unittest.TestCase):
         summary = cfg.summary()
         self.assertIn("kkb", summary)
         self.assertIn("masak", summary)
-        self.assertIn("t24", summary)
+        self.assertIn("boa", summary)
         self.assertIn("tcmb", summary)
         self.assertIn("swift", summary)
 
@@ -133,10 +133,10 @@ class TestMASAKClient(unittest.TestCase):
         self.assertLessEqual(hits, 15, "Hit rate too high for sanctions mock")
 
 
-class TestT24Client(unittest.TestCase):
+class TestBOAClient(unittest.TestCase):
 
     def test_mock_query_customer(self):
-        from integrations.t24_client import query_core_banking
+        from integrations.boa_client import query_core_banking
         result = query_core_banking("SELECT * FROM customers LIMIT 5", "core_banking")
         self.assertTrue(result["success"])
         self.assertEqual(result["source"], "MOCK")
@@ -144,13 +144,13 @@ class TestT24Client(unittest.TestCase):
         self.assertGreater(result["row_count"], 0)
 
     def test_mock_query_loans(self):
-        from integrations.t24_client import query_core_banking
+        from integrations.boa_client import query_core_banking
         result = query_core_banking("SELECT * FROM loans WHERE status='NPL'", "risk")
         self.assertTrue(result["success"])
         self.assertIn("rows", result)
 
     def test_mock_customer_360(self):
-        from integrations.t24_client import get_customer_360
+        from integrations.boa_client import get_customer_360
         result = get_customer_360("C12345")
         self.assertEqual(result["customer_id"], "C12345")
         self.assertEqual(result["source"], "MOCK")
@@ -159,13 +159,13 @@ class TestT24Client(unittest.TestCase):
         self.assertIn("kyc", result)
 
     def test_mock_customer_360_deterministic(self):
-        from integrations.t24_client import get_customer_360
+        from integrations.boa_client import get_customer_360
         r1 = get_customer_360("C99999")
         r2 = get_customer_360("C99999")
         self.assertEqual(r1["segment"], r2["segment"])
 
     def test_mock_transaction_history(self):
-        from integrations.t24_client import get_transaction_history
+        from integrations.boa_client import get_transaction_history
         result = get_transaction_history("C12345", limit=10)
         self.assertEqual(result["customer_id"], "C12345")
         self.assertEqual(result["source"], "MOCK")
