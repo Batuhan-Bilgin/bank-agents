@@ -1,0 +1,27 @@
+KREDI ONAY POLITIKASI v2.1
+
+1. BIREYSEL KREDI LIMITLERI
+Bireysel musterilerde maksimum kredi limiti aylik net gelirin 8 katiyla sinirlidir.
+Konut kredilerinde maksimum vade 240 ay, ihtiyac kredilerinde 60 aydir.
+DTI (Borc/Gelir Orani) yuzde 50 uzerinde olan basvurular otomatik reddedilir.
+
+2. KREDI SKORU ESIKLERI
+850 ve uzeri: Otomatik onay
+700-849: Analist incelemesi
+500-699: Kredi komitesi onayi gerekli
+500 altinda: Otomatik red
+
+3. TEMINAT GEREKSINIMLERI
+Konut kredilerinde ipotekli teminat zorunludur.
+100,000 TRY uzeri kredilerde ek teminat talep edilir.
+Teminat deger hesaplamalarinda BDDK standart iskontolari uygulanir.
+
+4. ESKALASYON KURALLARI
+10 milyon TRY uzeri tum kurumsal krediler Kredi Komitesine eskalee edilir.
+Aktif hukuki islemi olan musteriler otomatik reddedilir.
+Son 24 ayda temerrut yasayan musteriler eskalasyon gerektiren gozaltinda tutulur.
+
+5. UYUM GEREKSINIMLERI
+Tum kararlar BDDK Kredi Siniflandirmasi standartlarini karsilamalidir.
+Basel III sermaye yeterlilik oranlarinin korunmasi zorunludur.
+Her karar icin tam denetim izi tutulmalidir.

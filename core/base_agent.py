@@ -1,4 +1,5 @@
 
+import hashlib
 import json
 import os
 from typing import Any
@@ -11,9 +12,21 @@ from rich.panel import Panel
 from rich.markdown import Markdown
 
 from core.tool_registry import get_schemas_for_agent, execute_tool
+from core.metrics import AgentCallMetric, record_tool
+from core.hitl import needs_review, queue_for_review
+from core.memory import save_turn, build_context_block
+from training.decision_logger import log_decision
+from core.tool_guard import guard_execute
 
 load_dotenv()
 console = Console()
+
+
+def _extract_decision(text: str) -> str:
+    for keyword in ("APPROVE", "DECLINE", "REFER", "ESCALATE", "ALERT", "ONAY", "RED", "İNCELE"):
+        if keyword in text.upper():
+            return keyword
+    return ""
 
 MODEL = "claude-opus-4-6"
 MAX_TOKENS = 8192
@@ -36,14 +49,47 @@ class BaseAgent:
         self.languages: list[str] = config.get("languages", ["tr", "en"])
         self.max_auto_approval: float = config.get("max_auto_approval_amount", 0)
         self.audit_required: bool = config.get("audit_required", True)
+        self.hitl_threshold: float = config.get("hitl_threshold", 0.6)
+
+        self.knowledge_domains: list[str] = config.get("knowledge_domains", [])
 
         self._client: anthropic.Anthropic | None = None
         self._tool_schemas = get_schemas_for_agent(self.tool_names)
         self._conversation: list[dict] = []
+        self._customer_id: str = ""
+        self._dry_run: bool = config.get("dry_run", False)
 
-    def _build_system_prompt(self) -> str:
+    def _get_rag_context(self, query: str) -> str:
+        try:
+            from training.retriever import retrieve, is_ready
+            if not is_ready():
+                return ""
+            domains = self.knowledge_domains if self.knowledge_domains else None
+            return retrieve(query, domains=domains, top_k=5)
+        except Exception:
+            return ""
+
+    def _build_system_prompt(self, rag_context: str = "",
+                             memory_context: str = "") -> str:
         compliance_str = ", ".join(self.compliance_flags) if self.compliance_flags else "Standard"
         escalation = self.escalation_path or "Department Manager"
+        auth_desc = (
+            "Read-only; provide analysis and recommendations only." if self.authority_level == 1
+            else "Recommend actions; require approval for execution." if self.authority_level == 2
+            else "Execute standard operations within approved parameters." if self.authority_level == 3
+            else f"Approve transactions up to {self.max_auto_approval:,.0f} TRY." if self.authority_level == 4
+            else "Full executive authority within regulatory bounds."
+        )
+        rag_section = f"""
+## Bank Policy & Workflow Context
+The following is retrieved from official bank documents. Apply these rules with priority:
+
+{rag_context}
+""" if rag_context else ""
+        memory_section = f"""
+## Müşteri Geçmişi
+{memory_context}
+""" if memory_context else ""
         return f"""You are {self.role}, a specialised AI banking agent operating within the {self.department} department at BankAI.
 
 ## Your Identity
@@ -57,7 +103,7 @@ class BaseAgent:
 {self.base_instructions}
 
 ## Operational Constraints
-- **Authority Level {self.authority_level}**: {"Read-only; provide analysis and recommendations only." if self.authority_level == 1 else "Recommend actions; require approval for execution." if self.authority_level == 2 else "Execute standard operations within approved parameters." if self.authority_level == 3 else "Approve transactions up to {self.max_auto_approval:,.0f} TRY." if self.authority_level == 4 else "Full executive authority within regulatory bounds."}
+- **Authority Level {self.authority_level}**: {auth_desc}
 - **Max Auto-Approval**: {f"{self.max_auto_approval:,.0f} TRY" if self.max_auto_approval > 0 else "Not applicable — refer all actions for approval."}
 - **Escalation Path**: {escalation}
 - **Audit Required**: {"Yes — every action must be logged." if self.audit_required else "Logging recommended but not mandatory."}
@@ -82,10 +128,19 @@ You may access the following data categories: {", ".join(self.data_access) if se
 - Support both Turkish (tr) and English (en) — respond in the language the user writes in.
 - Never disclose sensitive customer data beyond what is necessary for the task.
 - For ambiguous requests, ask clarifying questions before acting.
-"""
+{memory_section}{rag_section}"""
 
-    def chat(self, user_message: str, verbose: bool = True) -> str:
+    def chat(self, user_message: str, verbose: bool = True,
+             customer_id: str = "") -> str:
+        if customer_id:
+            self._customer_id = customer_id
+        self._rag_context = self._get_rag_context(user_message)
+        if self._customer_id:
+            save_turn(self._customer_id, self.id, "user", user_message)
         self._conversation.append({"role": "user", "content": user_message})
+
+        metric = AgentCallMetric(self.id, self.department, "anthropic")
+        metric.task_hash = hashlib.md5(user_message.encode()).hexdigest()[:8]
 
         if verbose:
             console.print(Panel(
@@ -96,7 +151,18 @@ You may access the following data categories: {", ".join(self.data_access) if se
         loop_count = 0
         while loop_count < MAX_TOOL_LOOPS:
             loop_count += 1
-            response = self._call_api()
+            try:
+                response = self._call_api()
+            except Exception as exc:
+                metric.error = str(exc)[:200]
+                metric.loop_count = loop_count
+                metric.stop()
+                metric.save()
+                raise
+
+            if hasattr(response, "usage") and response.usage:
+                metric.input_tokens += getattr(response.usage, "input_tokens", 0)
+                metric.output_tokens += getattr(response.usage, "output_tokens", 0)
 
             text_blocks = []
             tool_calls = []
@@ -113,6 +179,29 @@ You may access the following data categories: {", ".join(self.data_access) if se
 
             if response.stop_reason == "end_turn" or not tool_calls:
                 final_text = "\n".join(text_blocks).strip()
+                metric.loop_count = loop_count
+                metric.decision = _extract_decision(final_text)
+                metric.stop()
+                metric.save()
+                review_needed, conf, reason = needs_review(final_text, self.hitl_threshold)
+                if review_needed:
+                    qid = queue_for_review(
+                        self.id, self.department,
+                        user_message, final_text, conf, reason
+                    )
+                    if verbose:
+                        console.print(f"  [yellow]⚠ HITL:[/yellow] Yanıt inceleme kuyruğuna alındı "
+                                      f"(#[bold]{qid}[/bold], güven: {conf:.2f})")
+                if self._customer_id and final_text:
+                    save_turn(self._customer_id, self.id, "assistant", final_text)
+                if final_text:
+                    try:
+                        log_decision(
+                            self.id, self.department, user_message, final_text,
+                            metric.decision, getattr(self, "_rag_context", "")
+                        )
+                    except Exception:
+                        pass
                 if verbose and final_text:
                     console.print(Panel(Markdown(final_text), title="[blue]Response[/blue]",
                                         border_style="blue"))
@@ -120,10 +209,15 @@ You may access the following data categories: {", ".join(self.data_access) if se
 
             tool_results = []
             for tc in tool_calls:
+                metric.tool_calls += 1
                 if verbose:
                     console.print(f"  [yellow]>> Tool:[/yellow] [bold]{tc.name}[/bold] "
                                   f"[dim]{json.dumps(tc.input)[:120]}[/dim]")
-                result = execute_tool(tc.name, tc.input)
+                with record_tool(self.id, tc.name):
+                    result = guard_execute(
+                        self.id, tc.name, tc.input,
+                        self.authority_level, self._dry_run
+                    )
                 if verbose:
                     console.print(f"  [green]<< Result:[/green] [dim]{str(result)[:200]}[/dim]")
                 tool_results.append({
@@ -134,6 +228,9 @@ You may access the following data categories: {", ".join(self.data_access) if se
 
             self._conversation.append({"role": "user", "content": tool_results})
 
+        metric.loop_count = MAX_TOOL_LOOPS
+        metric.stop()
+        metric.save()
         return "Maximum tool loop iterations reached. Please refine your request."
 
     def _get_client(self) -> anthropic.Anthropic:
@@ -148,10 +245,13 @@ You may access the following data categories: {", ".join(self.data_access) if se
         return self._client
 
     def _call_api(self) -> anthropic.types.Message:
+        mem_ctx = build_context_block(self._customer_id) if self._customer_id else ""
         kwargs: dict[str, Any] = {
             "model": MODEL,
             "max_tokens": MAX_TOKENS,
-            "system": self._build_system_prompt(),
+            "system": self._build_system_prompt(
+                getattr(self, "_rag_context", ""), mem_ctx
+            ),
             "messages": self._conversation,
             "thinking": {"type": "adaptive"},
         }

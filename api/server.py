@@ -10,7 +10,7 @@ load_dotenv()
 
 app = FastAPI(
     title="BankAI Agent API",
-    description="100 Specialised Banking AI Agents powered by Claude Opus 4.6",
+    description="80 Specialised Banking Agents — multi-department decision automation for Turkish banks.",
     version="1.0.0",
 )
 

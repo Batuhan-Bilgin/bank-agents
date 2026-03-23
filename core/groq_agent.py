@@ -1,4 +1,5 @@
 
+import hashlib
 import json
 import os
 from typing import Any
@@ -9,6 +10,12 @@ from rich.panel import Panel
 from rich.markdown import Markdown
 
 from core.tool_registry import get_schemas_for_agent, execute_tool
+from core.metrics import AgentCallMetric, record_tool
+from core.base_agent import _extract_decision
+from core.hitl import needs_review, queue_for_review
+from core.memory import save_turn, build_context_block
+from training.decision_logger import log_decision
+from core.tool_guard import guard_execute
 
 console = Console()
 
@@ -33,11 +40,15 @@ class GroqBaseAgent:
         self.languages: list[str] = config.get("languages", ["tr", "en"])
         self.max_auto_approval: float = config.get("max_auto_approval_amount", 0)
         self.audit_required: bool = config.get("audit_required", True)
+        self.hitl_threshold: float = config.get("hitl_threshold", 0.6)
+        self.knowledge_domains: list[str] = config.get("knowledge_domains", [])
 
         self._client: groq_sdk.Groq | None = None
         self._anthropic_schemas = get_schemas_for_agent(self.tool_names)
         self._tool_schemas = self._to_openai_tools(self._anthropic_schemas)
         self._conversation: list[dict] = []
+        self._customer_id: str = ""
+        self._dry_run: bool = config.get("dry_run", False)
 
     @staticmethod
     def _to_openai_tools(anthropic_schemas: list[dict]) -> list[dict]:
@@ -55,7 +66,18 @@ class GroqBaseAgent:
             })
         return tools
 
-    def _build_system_prompt(self) -> str:
+    def _get_rag_context(self, query: str) -> str:
+        try:
+            from training.retriever import retrieve, is_ready
+            if not is_ready():
+                return ""
+            domains = self.knowledge_domains if self.knowledge_domains else None
+            return retrieve(query, domains=domains, top_k=5)
+        except Exception:
+            return ""
+
+    def _build_system_prompt(self, rag_context: str = "",
+                              memory_context: str = "") -> str:
         compliance_str = ", ".join(self.compliance_flags) if self.compliance_flags else "Standard"
         escalation = self.escalation_path or "Department Manager"
         auth_desc = {
@@ -66,6 +88,16 @@ class GroqBaseAgent:
             5: "Full executive authority within regulatory bounds.",
         }.get(self.authority_level, "Standard authority.")
 
+        rag_section = f"""
+## Bank Policy & Workflow Context
+The following is retrieved from official bank documents. Apply these rules with priority:
+
+{rag_context}
+""" if rag_context else ""
+        memory_section = f"""
+## Müşteri Geçmişi
+{memory_context}
+""" if memory_context else ""
         return f"""You are {self.role}, a specialised AI banking agent in the {self.department} department at BankAI.
 
 ## Your Identity
@@ -98,10 +130,20 @@ Always apply relevant regulatory requirements in every decision.
 - Be precise, professional, and concise.
 - Use structured output (tables, bullet points) for complex information.
 - Support both Turkish (tr) and English (en) — respond in the language the user writes in.
-- Never disclose sensitive customer data beyond what is necessary."""
+- Never disclose sensitive customer data beyond what is necessary.
+{memory_section}{rag_section}"""
 
-    def chat(self, user_message: str, verbose: bool = True) -> str:
+    def chat(self, user_message: str, verbose: bool = True,
+             customer_id: str = "") -> str:
+        if customer_id:
+            self._customer_id = customer_id
+        self._rag_context = self._get_rag_context(user_message)
+        if self._customer_id:
+            save_turn(self._customer_id, self.id, "user", user_message)
         self._conversation.append({"role": "user", "content": user_message})
+
+        metric = AgentCallMetric(self.id, self.department, "groq")
+        metric.task_hash = hashlib.md5(user_message.encode()).hexdigest()[:8]
 
         if verbose:
             console.print(Panel(
@@ -116,6 +158,7 @@ Always apply relevant regulatory requirements in every decision.
                 response = self._call_api()
             except groq_sdk.BadRequestError as e:
                 err_msg = str(e)
+                metric.error = err_msg[:200]
                 if verbose:
                     console.print(f"  [red]Model error:[/red] [dim]{err_msg[:200]}[/dim]")
                 try:
@@ -123,17 +166,27 @@ Always apply relevant regulatory requirements in every decision.
                         model=GROQ_MODEL,
                         max_tokens=MAX_TOKENS,
                         messages=[
-                            {"role": "system", "content": self._build_system_prompt()},
+                            {"role": "system", "content": self._build_system_prompt(getattr(self, "_rag_context", ""))},
                             *[m for m in self._conversation if m["role"] in ("user", "assistant") and not m.get("tool_calls")],
                             {"role": "user", "content": "Summarize your findings so far and provide a final answer based on the information you have gathered."},
                         ],
                     )
                     final_text = (fallback.choices[0].message.content or "").strip()
+                    metric.loop_count = loop_count
+                    metric.stop()
+                    metric.save()
                     if verbose and final_text:
                         console.print(Panel(Markdown(final_text), title="[blue]Response[/blue]", border_style="blue"))
                     return final_text
                 except Exception:
+                    metric.stop()
+                    metric.save()
                     return "Analysis partially complete. Tool execution encountered an error — please retry."
+
+            if response.usage:
+                metric.input_tokens += response.usage.prompt_tokens or 0
+                metric.output_tokens += response.usage.completion_tokens or 0
+
             message = response.choices[0].message
             finish_reason = response.choices[0].finish_reason
 
@@ -152,6 +205,29 @@ Always apply relevant regulatory requirements in every decision.
 
             if finish_reason != "tool_calls" or not message.tool_calls:
                 final_text = (message.content or "").strip()
+                metric.loop_count = loop_count
+                metric.decision = _extract_decision(final_text)
+                metric.stop()
+                metric.save()
+                review_needed, conf, reason = needs_review(final_text, self.hitl_threshold)
+                if review_needed:
+                    qid = queue_for_review(
+                        self.id, self.department,
+                        user_message, final_text, conf, reason
+                    )
+                    if verbose:
+                        console.print(f"  [yellow]⚠ HITL:[/yellow] Yanıt inceleme kuyruğuna alındı "
+                                      f"(#[bold]{qid}[/bold], güven: {conf:.2f})")
+                if self._customer_id and final_text:
+                    save_turn(self._customer_id, self.id, "assistant", final_text)
+                if final_text:
+                    try:
+                        log_decision(
+                            self.id, self.department, user_message, final_text,
+                            metric.decision, getattr(self, "_rag_context", "")
+                        )
+                    except Exception:
+                        pass
                 if verbose and final_text:
                     console.print(Panel(
                         Markdown(final_text),
@@ -160,6 +236,7 @@ Always apply relevant regulatory requirements in every decision.
                 return final_text
 
             for tc in message.tool_calls:
+                metric.tool_calls += 1
                 try:
                     arguments = json.loads(tc.function.arguments)
                 except json.JSONDecodeError:
@@ -169,7 +246,11 @@ Always apply relevant regulatory requirements in every decision.
                     console.print(f"  [yellow]>> Tool:[/yellow] [bold]{tc.function.name}[/bold] "
                                   f"[dim]{tc.function.arguments[:120]}[/dim]")
 
-                result = execute_tool(tc.function.name, arguments)
+                with record_tool(self.id, tc.function.name):
+                    result = guard_execute(
+                        self.id, tc.function.name, arguments,
+                        self.authority_level, self._dry_run
+                    )
 
                 if verbose:
                     console.print(f"  [green]<< Result:[/green] [dim]{str(result)[:200]}[/dim]")
@@ -180,6 +261,9 @@ Always apply relevant regulatory requirements in every decision.
                     "content": json.dumps(result, ensure_ascii=False, default=str),
                 })
 
+        metric.loop_count = MAX_TOOL_LOOPS
+        metric.stop()
+        metric.save()
         return "Maximum tool loop iterations reached. Please refine your request."
 
     def _get_client(self) -> groq_sdk.Groq:
@@ -193,11 +277,14 @@ Always apply relevant regulatory requirements in every decision.
         return self._client
 
     def _call_api(self):
+        mem_ctx = build_context_block(self._customer_id) if self._customer_id else ""
         kwargs: dict[str, Any] = {
             "model": GROQ_MODEL,
             "max_tokens": MAX_TOKENS,
             "messages": [
-                {"role": "system", "content": self._build_system_prompt()}
+                {"role": "system", "content": self._build_system_prompt(
+                    getattr(self, "_rag_context", ""), mem_ctx
+                )}
             ] + self._conversation,
         }
         if self._tool_schemas:

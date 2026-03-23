@@ -86,13 +86,17 @@ def get_tool_schema(name: str) -> dict | None:
     return entry[0] if entry else None
 
 
-def execute_tool(name: str, arguments: dict) -> dict:
+def execute_tool(name: str, arguments: dict, mask_pii: bool = True) -> dict:
     entry = _REGISTRY.get(name)
     if not entry:
         return {"error": f"Tool '{name}' not found in registry", "available": list(_REGISTRY.keys())}
     _, handler = entry
     try:
-        return handler(**arguments)
+        result = handler(**arguments)
+        if mask_pii:
+            from core.pii_guard import guard_tool_result
+            result = guard_tool_result(name, result)
+        return result
     except Exception as exc:
         return {"error": f"Tool execution failed: {exc}", "tool": name}
 

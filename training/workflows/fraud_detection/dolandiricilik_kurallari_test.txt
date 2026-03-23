@@ -1,0 +1,22 @@
+DOLANDIRICILIK TESPIT KURALLARI v1.4
+
+1. YUKSEK RISKLI ISLEM KALIPLARI
+Gunluk 50,000 TRY uzeri yurt disi transferler otomatik incelemeye alinir.
+Bir saat icinde 5 veya daha fazla farkli alici icin yapilan islemler suspicious olarak isaretlenir.
+Gece 00:00-05:00 saatleri arasinda 10,000 TRY uzeri nakit cekim islemleri alarm tetikler.
+
+2. KART DOLANDIRICILIGI
+Farkli ulkelerden 30 dakika icinde gerceklesen islemler geolocation fraud olarak siniflandirilir.
+Yeni kartlarda ilk 48 saat icinde 5,000 TRY uzeri islemler ek dogrulama gerektirir.
+3D Secure basarisiz denemeler ardindan basarili islem suspicious olarak isaretlenir.
+
+3. HESAP DEVRALMA (ATO)
+Parola degisikligi sonrasi 1 saat icinde yapilan buyuk islemler bloke edilir.
+Farkli cihaz/IP kombinasyonlarinda art arda oturum acma denemeleri kilitlenir.
+Profil guncellemesi + hemen buyuk transfer kombinasyonu fraud risk 9/10 puan alir.
+
+4. AKSIYON ESIKLERI
+Risk skoru 0-3: Normal islem
+Risk skoru 4-6: Izleme listesine al
+Risk skoru 7-8: Musteri dogrulamasi iste
+Risk skoru 9-10: Islemi bloke et, AML birimine bildir

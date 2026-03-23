@@ -40,3 +40,12 @@ Thumbs.db
 *.db
 *.sqlite
 audit.db
+
+# Runtime data (SQLite metrics, HITL, memory, fine-tune exports)
+data/
+
+# ChromaDB vector store
+training/db/
+
+# Fine-tuning JSONL exports
+*.jsonl

@@ -12,7 +12,7 @@ print("=" * 60)
 gorev = input("\nGorev gir: ")
 
 print("\nHangi pipeline?")
-print("1. Kredi Baskuru  (credit_risk + sanctions + regulatory)")
+print("1. Kredi Basvuru  (credit_risk + sanctions + regulatory)")
 print("2. Dolandiricilik (fraud_detector + aml_monitor + alert)")
 print("3. Musteri 360    (customer_inquiry + credit_risk + aml)")
 print("4. Manuel         (ajan ID'lerini kendin gir)")
